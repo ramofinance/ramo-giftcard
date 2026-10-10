@@ -3,7 +3,7 @@ import CardPreview from "./CardPreview";
 import { getTemplate } from "../lib/templates";
 
 const STEPS = [
-  ["۱", "قالب را انتخاب کنید", "از بین ۱۰۰ طرح، کارتی که به مناسبت می‌خورد را بردارید."],
+  ["۱", "قالب را انتخاب کنید", "از بین ۲۰ طرح تصویرسازی‌شده، کارت مناسب لحظه‌تان را بردارید."],
   ["۲", "مبلغ و پیام را بنویسید", "تتر یا USDC روی شبکه‌ی BNB Chain، با اسم و پیام دلخواه."],
   ["۳", "با کیف پول خودتان پرداخت کنید", "پول مستقیم از کیف شما می‌رود؛ ما به کلید شما دسترسی نداریم."],
   ["۴", "هدیه در تلگرام می‌رسد", "گیرنده کارت و یک کیف پول تازه با ۱۲ کلمه‌ی بازیابی می‌گیرد."]
@@ -24,7 +24,7 @@ export default function HomePage() {
             <Link className="btn" to="/templates">انتخاب قالب</Link>
             <Link className="btn ghost" to="/create/1">شروع سریع</Link>
           </div>
-          <div className="hero-meta"><span>۱۰۰ طرح اختصاصی</span><span>USDT · USDC</span><span>BNB Smart Chain</span></div>
+          <div className="hero-meta"><span>۲۰ طرح تصویرسازی‌شده</span><span>USDT · USDC</span><span>BNB Smart Chain</span></div>
         </div>
         <div className="hero-card">
           <CardPreview template={getTemplate(1)} senderName="رضا" receiverName="سارا" amount="25" token="USDT" cardText="تولدت مبارک! این هدیه‌ی کوچک من به توست." />

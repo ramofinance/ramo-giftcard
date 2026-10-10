@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CATEGORIES, TEMPLATES, gradientCss } from "../lib/templates";
+import CardPreview from "./CardPreview";
+import { CATEGORIES, TEMPLATES } from "../lib/templates";
 
 export default function TemplatesPage() {
   const [cat, setCat] = useState<string>("all");
@@ -17,9 +18,14 @@ export default function TemplatesPage() {
       </div>
       <div className="grid">
         {list.map((t) => (
-          <Link key={t.id} to={`/create/${t.id}`} className="tpl" data-category={t.category} style={{ background: gradientCss(t) }}>
-            <span className="tpl-emoji">{t.emoji}</span>
-            <span className="tpl-name">{t.name}</span>
+          <Link key={t.id} to={`/create/${t.id}`} className="tpl" data-category={t.category}>
+            <span className="tpl-image">
+              <CardPreview template={t} senderName="رامو" receiverName="دوست عزیز" amount="25" token="USDT" cardText="یک هدیه‌ی کوچک برای تو" />
+            </span>
+            <span className="tpl-caption">
+              <span><small>{t.categoryName}</small><strong>{t.name}</strong></span>
+              <span className="tpl-arrow" aria-hidden="true">↗</span>
+            </span>
           </Link>
         ))}
       </div>
