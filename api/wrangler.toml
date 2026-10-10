@@ -1,1 +1,8 @@
-bmFtZSA9ICJyYW1vLWdpZnRjYXJkLWFwaSIKbWFpbiA9ICJzcmMvaW5kZXgudHMiCmNvbXBhdGliaWxpdHlfZGF0ZSA9ICIyMDI1LTAxLTAxIgoKW1trdl9uYW1lc3BhY2VzXV0KYmluZGluZyA9ICJHSUZUX0tWIgppZCA9ICI1NDQ0M2E0ZDMzNTA0YTgzYWNiZDE0NzM3OGJhNzkzMyIKcHJldmlld19pZCA9ICI1NDQ0M2E0ZDMzNTA0YTgzYWNiZDE0NzM3OGJhNzkzMyIK
+name = "ramo-giftcard-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "GIFT_KV"
+id = "54443a4d33504a83acbd147378ba7933"
+preview_id = "54443a4d33504a83acbd147378ba7933"
