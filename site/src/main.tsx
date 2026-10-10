@@ -1,4 +1,12 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+import "./styles.css";
+
+// Inside Telegram: tell the app we are ready and use the full height.
+const wa = (window as any).Telegram?.WebApp;
+if (wa) {
+  wa.ready?.();
+  wa.expand?.();
+}
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);

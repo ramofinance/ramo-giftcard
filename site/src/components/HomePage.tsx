@@ -1,33 +1,52 @@
-import React from "react";
 import { Link } from "react-router-dom";
-const HOW = [
-  { num: "۱", title: "تم رو انتخاب کن", desc: "از بین ۱۲+ تم مختلف یکی رو انتخاب می‌کنی" },
-  { num: "۲", title: "اطلاعات رو پر کن", desc: "اسم طرف مقابل، پیام تبریک و مبلغ USDT" },
-  { num: "۳", title: "پرداخت و ارسال", desc: "مبلغ رو به خزانه واریز می‌کنی، ما کیف جدید می‌سازیم" },
-  { num: "۴", title: "گیرنده دریافت می‌کنه", desc: "کیف + موجودی + آموزش نصب توی تلگرام براش میاد" },
+import CardPreview from "./CardPreview";
+import { getTemplate } from "../lib/templates";
+
+const STEPS = [
+  ["۱", "قالب را انتخاب کنید", "از بین ۱۰۰ طرح، کارتی که به مناسبت می‌خورد را بردارید."],
+  ["۲", "مبلغ و پیام را بنویسید", "تتر یا USDC روی شبکه‌ی BNB Chain، با اسم و پیام دلخواه."],
+  ["۳", "با کیف پول خودتان پرداخت کنید", "پول مستقیم از کیف شما می‌رود؛ ما به کلید شما دسترسی نداریم."],
+  ["۴", "هدیه در تلگرام می‌رسد", "گیرنده کارت و یک کیف پول تازه با ۱۲ کلمه‌ی بازیابی می‌گیرد."]
 ];
+
 export default function HomePage() {
   return (
-    <div>
+    <>
       <section className="hero">
-        <h1>کارت هدیه رمزارز<br />برای همه</h1>
-        <p>با RAMO Gift Card می‌تونی به دوست و آشنا USDT هدیه بدی، حتی اگه هیچی از بلاکچین ندونه. ما براش کیف می‌سازیم، پول می‌ریزیم و آموزش می‌دیم. 🎁</p>
-        <div className="hero-cta">
-          <Link to="/templates" className="btn-primary">ساخت کارت هدیه</Link>
-          <a href="https://t.me/ramofinance_alerts_bot" className="btn-secondary" target="_blank">ربات تلگرام</a>
+        <div className="hero-text">
+          <h1>هدیه‌ی رمزارزی بدهید،<br />به‌سادگی یک کارت تبریک</h1>
+          <p>
+            یک کارت قشنگ با مبلغ دلخواه تتر. گیرنده‌ی شما در تلگرام کارت را می‌گیرد و بدون هیچ دانش قبلی، قدم‌به‌قدم
+            با کیف پول Rabby وارد دنیای بلاکچین می‌شود.
+          </p>
+          <div className="row">
+            <Link className="btn" to="/templates">انتخاب قالب</Link>
+            <Link className="btn ghost" to="/create/1">شروع سریع</Link>
+          </div>
+        </div>
+        <div className="hero-card">
+          <CardPreview template={getTemplate(14)} senderName="رضا" receiverName="سارا" amount="25" token="USDT" cardText="تولدت مبارک! این هدیه‌ی کوچک من به توست." />
         </div>
       </section>
-      <section>
-        <h2 className="page-title" style={{textAlign:"center"}}>چطور کار می‌کنه؟</h2>
-        <div className="how">
-          {HOW.map((h, i) => (
-            <div className="how-card" key={i}>
-              <div className="num">{h.num}</div>
-              <h3>{h.title}</h3>
-              <p>{h.desc}</p>
-            </div>
-          ))}
-        </div>
+
+      <section className="steps">
+        {STEPS.map(([n, title, text]) => (
+          <div className="step" key={n}>
+            <span className="step-n">{n}</span>
+            <h3>{title}</h3>
+            <p>{text}</p>
+          </div>
+        ))}
       </section>
-      <section style={{textAlign:"center",padding:"30px 0"}}>
-        <h2 style={{fontSize:20,marginBottom:8}}>چرا RAMO Gift Card؟</h
+
+      <section className="trust">
+        <h2>امنیت، بدون نگهداری</h2>
+        <ul>
+          <li>کیف هدیه در مرورگر خود شما ساخته می‌شود و ۱۲ کلمه‌ی آن هیچ‌جا روی سرور ما ذخیره نمی‌شود.</li>
+          <li>پرداخت از کیف پول خودتان انجام می‌شود و ما هیچ دسترسی‌ای به موجودی شما نداریم.</li>
+          <li>کارمزد سرویس ۰٫۵ دلار است و قبل از پرداخت دقیق نمایش داده می‌شود.</li>
+        </ul>
+      </section>
+    </>
+  );
+}

@@ -1,1 +1,9 @@
-{"name":"ramo-giftcard-api","scripts":{"dev":"wrangler dev","deploy":"wrangler deploy"},"dependencies":{"ethers":"^6.13.0","itty-router":"^5.0.0"},"devDependencies":{"@cloudflare/workers-types":"^4.20240501.0","wrangler":"^3.0.0","typescript":"^5.4.0"}}
+{
+  "name": "ramo-giftcard-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test/worker.test.mjs"
+  }
+}

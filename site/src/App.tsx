@@ -1,50 +1,47 @@
-import React, { useState } from "react";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
-import HomePage from "./components/HomePage";
-import TemplatesPage from "./components/TemplatesPage";
+import { HashRouter, Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import CreatePage from "./components/CreatePage";
-import OrderStatus from "./components/OrderStatus";
-import "./styles.css";
+import HomePage from "./components/HomePage";
+import MyGifts from "./components/MyGifts";
+import TemplatesPage from "./components/TemplatesPage";
+import { loadPending } from "./lib/flow";
+import { currentUser } from "./lib/telegram";
 
-export default function App() {
+function Layout() {
+  useLocation(); // re-render on navigation so the banner below stays current
+  const pending = loadPending();
+  const user = currentUser();
   return (
-    <BrowserRouter>
-      <NavBar />
-      <main className="main-content">
+    <div className="shell">
+      <header className="top">
+        <Link to="/" className="brand">🎁 RAMO Gift</Link>
+        <nav>
+          <NavLink to="/templates">قالب‌ها</NavLink>
+          <NavLink to="/mine">هدیه‌های من</NavLink>
+        </nav>
+        {user && <span className="who">{user.first_name}</span>}
+      </header>
+      {pending && (
+        <Link to={`/create/${pending.templateId}`} className="banner">یک هدیه‌ی نیمه‌کاره دارید؛ برای ادامه یا بازیابی اینجا بزنید</Link>
+      )}
+      <main>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/templates" element={<TemplatesPage />} />
-          <Route path="/create/:templateId" element={<CreatePage />} />
-          <Route path="/order/:orderId" element={<OrderStatus />} />
+          <Route path="/create/:id" element={<CreatePage />} />
+          <Route path="/mine" element={<MyGifts />} />
+          <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
-      <SiteFooter />
-    </BrowserRouter>
+      <footer className="foot">RAMO Finance • شبکه‌ی BNB Smart Chain • ۱۲ کلمه‌ی کیف هدیه روی سرور ما ذخیره نمی‌شود</footer>
+    </div>
   );
 }
 
-function NavBar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const location = useLocation();
+// HashRouter works on GitHub Pages and inside the Telegram Mini App without server rewrites.
+export default function App() {
   return (
-    <nav className="navbar">
-      <div className="nav-inner">
-        <Link to="/" className="nav-logo">🎁 RAMO Gift</Link>
-        <div className={`nav-links ${menuOpen ? "open" : ""}`}>
-          <Link to="/" className={location.pathname === "/" ? "active" : ""}>خانه</Link>
-          <Link to="/templates" className={location.pathname === "/templates" ? "active" : ""}>قالب‌ها</Link>
-          <a href="https://t.me/ramofinance_alerts_bot" target="_blank">ربات تلگرام</a>
-        </div>
-        <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "✕" : "☰"}</button>
-      </div>
-    </nav>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer className="footer">
-      <p>ساخته شده با ❤️ توسط ramofinance | کارت هدیه رمزارز برای همه</p>
-    </footer>
+    <HashRouter>
+      <Layout />
+    </HashRouter>
   );
 }
