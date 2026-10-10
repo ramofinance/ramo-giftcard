@@ -17,7 +17,7 @@ export default function TemplatesPage() {
       </div>
       <div className="grid">
         {list.map((t) => (
-          <Link key={t.id} to={`/create/${t.id}`} className="tpl" style={{ background: gradientCss(t) }}>
+          <Link key={t.id} to={`/create/${t.id}`} className="tpl" data-category={t.category} style={{ background: gradientCss(t) }}>
             <span className="tpl-emoji">{t.emoji}</span>
             <span className="tpl-name">{t.name}</span>
           </Link>

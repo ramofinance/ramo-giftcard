@@ -13,7 +13,10 @@ function Layout() {
   return (
     <div className="shell">
       <header className="top">
-        <Link to="/" className="brand">🎁 RAMO Gift</Link>
+        <Link to="/" className="brand">
+          <span className="brand-symbol" aria-hidden="true">R</span>
+          <span className="brand-name">RAMO <i>GIFT</i></span>
+        </Link>
         <nav>
           <NavLink to="/templates">قالب‌ها</NavLink>
           <NavLink to="/mine">هدیه‌های من</NavLink>

@@ -14,6 +14,7 @@ export default function HomePage() {
     <>
       <section className="hero">
         <div className="hero-text">
+          <span className="hero-eyebrow">RAMO FINANCE · DIGITAL GIFTS</span>
           <h1>هدیه‌ی رمزارزی بدهید،<br />به‌سادگی یک کارت تبریک</h1>
           <p>
             یک کارت قشنگ با مبلغ دلخواه تتر. گیرنده‌ی شما در تلگرام کارت را می‌گیرد و بدون هیچ دانش قبلی، قدم‌به‌قدم
@@ -23,9 +24,10 @@ export default function HomePage() {
             <Link className="btn" to="/templates">انتخاب قالب</Link>
             <Link className="btn ghost" to="/create/1">شروع سریع</Link>
           </div>
+          <div className="hero-meta"><span>۱۰۰ طرح اختصاصی</span><span>USDT · USDC</span><span>BNB Smart Chain</span></div>
         </div>
         <div className="hero-card">
-          <CardPreview template={getTemplate(14)} senderName="رضا" receiverName="سارا" amount="25" token="USDT" cardText="تولدت مبارک! این هدیه‌ی کوچک من به توست." />
+          <CardPreview template={getTemplate(1)} senderName="رضا" receiverName="سارا" amount="25" token="USDT" cardText="تولدت مبارک! این هدیه‌ی کوچک من به توست." />
         </div>
       </section>
 
