@@ -180,7 +180,12 @@ async function handleTelegramWebhook(request, env, reply) {
   if (message.chat?.type !== "private" || String(message.chat.id) !== String(message.from?.id)) return reply({ ok: true });
   const isAdmin = Boolean(username && configuredAdmins(env).has(username));
   const language = localeOf(message.from?.language_code);
-  if (isAdmin) await env.GIFT_KV.put(`admin:${username}`, String(message.chat.id));
+  const registeredChat = isAdmin ? await env.GIFT_KV.get(`admin:${username}`) : null;
+  if (isAdmin && registeredChat && String(registeredChat) !== String(message.chat.id)) {
+    await sendHtml(env, message.chat.id, BOT_COPY[language].notAdmin);
+    return reply({ ok: true });
+  }
+  if (isAdmin && !registeredChat) await env.GIFT_KV.put(`admin:${username}`, String(message.chat.id));
   await sendHtml(env, message.chat.id, BOT_COPY[language][isAdmin ? "registered" : "notAdmin"]);
   return reply({ ok: true });
 }

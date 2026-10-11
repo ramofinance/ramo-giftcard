@@ -58,6 +58,8 @@ r = await call("POST", "/api/telegram/webhook", { message: { text: "/start", fro
 ok("configured admin registers by username", r.status === 200 && await env.GIFT_KV.get("admin:adminone") === "900");
 r = await call("POST", "/api/telegram/webhook", { message: { text: "/start", from: { id: 901, username: "admintwo" }, chat: { id: 901, type: "private" } } }, { "X-Telegram-Bot-Api-Secret-Token": WEBHOOK_SECRET });
 ok("second configured admin registers by username", r.status === 200 && await env.GIFT_KV.get("admin:admintwo") === "901");
+r = await call("POST", "/api/telegram/webhook", { message: { text: "/start", from: { id: 903, username: "adminone" }, chat: { id: 903, type: "private" } } }, { "X-Telegram-Bot-Api-Secret-Token": WEBHOOK_SECRET });
+ok("later /start cannot take over an already-registered admin username", r.status === 200 && await env.GIFT_KV.get("admin:adminone") === "900");
 r = await call("POST", "/api/telegram/webhook", { message: { text: "/start", from: { id: 902, username: "notadmin" }, chat: { id: 902, type: "private" } } }, { "X-Telegram-Bot-Api-Secret-Token": WEBHOOK_SECRET });
 ok("unconfigured username cannot register as admin", r.status === 200 && await env.GIFT_KV.get("admin:notadmin") === null);
 
