@@ -155,7 +155,7 @@ export default function CreatePage() {
   return (
     <div className="create">
       <section className="create-preview">
-        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} cardTextPositions={textPositions} cardTextColors={textColors} selectedText={selectedText} onTextPositionChange={updatePosition} language={language} />
+        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} cardTextPositions={textPositions} cardTextColors={textColors} selectedText={selectedText} onTextSelect={setSelectedText} onTextPositionChange={updatePosition} language={language} />
         <div className="row between">
           <span className="dim small">{t("create.template")}: {t(`tpl.${template.design}`)}</span>
           <Link to="/templates" className="small">{t("create.change")}</Link>

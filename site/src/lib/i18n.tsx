@@ -101,7 +101,7 @@ const MESSAGES: Record<string, Translation> = {
   "create.textSize": ["اندازه‌ی متن", "حجم النص", "Text size", "Tamaño del texto", "文字大小"],
   "create.rotation": ["چرخش متن", "تدوير النص", "Text rotation", "Rotación del texto", "文字旋转"],
   "create.textEditorTitle": ["جایگاه و رنگ نوشته‌ها", "موضع النصوص وألوانها", "Text position & color", "Posición y color del texto", "文字位置与颜色"],
-  "create.textEditorHint": ["لایه را انتخاب کنید و روی پیش‌نمایش بکشید، یا جای آن را با مختصات تنظیم کنید.", "اختر طبقة واسحبها على المعاينة، أو اضبط موضعها بالإحداثيات.", "Choose a layer and drag it on the preview, or fine-tune its coordinates.", "Elige una capa y arrástrala en la vista previa, o ajusta sus coordenadas.", "选择文字图层并在预览中拖动，也可精确调整坐标。"],
+  "create.textEditorHint": ["روی نوشته‌ی کارت بزنید تا انتخاب شود؛ سپس آن را بکشید یا جای آن را با مختصات تنظیم کنید.", "اضغط على النص لتحديده، ثم اسحبه أو اضبط موضعه بالإحداثيات.", "Click text on the card to select it, then drag it or fine-tune its coordinates.", "Pulsa el texto para seleccionarlo y arrástralo o ajusta sus coordenadas.", "点击卡片上的文字即可选中，再拖动或精确调整坐标。"],
   "create.textLayer": ["نوشته برای ویرایش", "النص المراد تعديله", "Text layer", "Capa de texto", "文字图层"],
   "create.layer.brand": ["نام برند", "اسم العلامة", "Brand", "Marca", "品牌"],
   "create.layer.category": ["مناسبت", "المناسبة", "Occasion", "Ocasión", "场合"],

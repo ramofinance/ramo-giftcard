@@ -734,12 +734,56 @@ export function defaultCardTextColors(template: Template): CardTextColors {
   return { brand: light, category: light, receiver: main, sender: main, amount: main, message: main, network: light };
 }
 
+export function hitTestCardText(p: CardParams, x: number, y: number): CardTextField | undefined {
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx) return undefined;
+  const t = p.template;
+  const rtl = p.language === "fa" || p.language === "ar";
+  const split = t.layout === "split";
+  const rightText = t.design === "love-garden-couple" || t.design === "love-blossoms";
+  const center = split ? 290 : rightText ? 776 : CARD_W / 2;
+  const maxWidth = split ? 465 : rightText ? 380 : 760;
+  const positions = { ...defaultCardTextPositions(t), ...p.cardTextPositions };
+  const cardFont = FONT_FAMILIES[p.cardFont] || FONT_FAMILIES.modern;
+  const textSize = Math.max(16, Math.min(38, Number(p.cardTextSize) || 23));
+  const layers: { field: CardTextField; lines: string[]; position: { x: number; y: number }; font: string; align: CanvasTextAlign; direction: CanvasDirection; maxWidth: number; size: number; lineHeight: number; rotation?: number }[] = [
+    { field: "brand", lines: ["RAMO  /  GIFT CARD"], position: positions.brand!, font: `700 21px ${FONT}`, align: "left", direction: "ltr", maxWidth: 290, size: 21, lineHeight: 25 },
+    { field: "category", lines: [translate(p.language, `cat.${t.category}`)], position: positions.category!, font: `600 19px ${FONT}`, align: "right", direction: rtl ? "rtl" : "ltr", maxWidth: 240, size: 19, lineHeight: 23 },
+    { field: "receiver", lines: [p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty")], position: positions.receiver!, font: `800 ${split ? 42 : 34}px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", maxWidth, size: split ? 42 : 34, lineHeight: split ? 48 : 40 },
+    { field: "sender", lines: [p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty")], position: positions.sender!, font: `500 21px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", maxWidth, size: 21, lineHeight: 25 },
+    { field: "amount", lines: [`${p.amount || "0"} ${p.token}`], position: positions.amount!, font: `800 ${split ? 72 : 66}px ${FONT}`, align: "center", direction: "ltr", maxWidth, size: split ? 72 : 66, lineHeight: 78 }
+  ];
+  ctx.font = `400 ${textSize}px ${cardFont}`;
+  ctx.direction = rtl ? "rtl" : "ltr";
+  const messageLines = wrapLines(ctx, p.cardText || translate(p.language, "card.default"), maxWidth - 30, 2, p.language);
+  layers.push(
+    { field: "message", lines: messageLines, position: positions.message!, font: `400 ${textSize}px ${cardFont}`, align: "center", direction: rtl ? "rtl" : "ltr", maxWidth: maxWidth - 30, size: textSize, lineHeight: textSize * 1.42, rotation: Math.max(-12, Math.min(12, Number(p.cardTextRotation) || 0)) },
+    { field: "network", lines: ["BNB SMART CHAIN"], position: positions.network!, font: `500 16px ${FONT}`, align: "center", direction: "ltr", maxWidth: 270, size: 16, lineHeight: 20 }
+  );
+
+  for (const layer of layers.reverse()) {
+    ctx.font = layer.font;
+    ctx.direction = layer.direction;
+    const angle = (-(layer.rotation ?? 0) * Math.PI) / 180;
+    const dx = x - layer.position.x;
+    const dy = y - layer.position.y;
+    const localX = dx * Math.cos(angle) - dy * Math.sin(angle);
+    const localY = dx * Math.sin(angle) + dy * Math.cos(angle);
+    for (let index = 0; index < layer.lines.length; index += 1) {
+      const width = Math.min(ctx.measureText(layer.lines[index]).width, layer.maxWidth);
+      const left = layer.align === "left" ? 0 : layer.align === "right" ? -width : -width / 2;
+      const baseline = (index - (layer.lines.length - 1) / 2) * layer.lineHeight;
+      if (localX >= left - 12 && localX <= left + width + 12 && localY >= baseline - layer.size - 8 && localY <= baseline + layer.size * 0.4 + 8) return layer.field;
+    }
+  }
+  return undefined;
+}
+
 type TextLayerStyle = {
   font: string;
   align: CanvasTextAlign;
   color: string;
   width: number;
-  height: number;
   direction?: CanvasDirection;
   rotation?: number;
   lineHeight?: number;
@@ -758,19 +802,16 @@ function drawTextLayer(
   ctx.textAlign = style.align;
   ctx.textBaseline = "alphabetic";
   ctx.direction = style.direction ?? "ltr";
-  ctx.fillStyle = style.color;
-  if (style.rotation) {
-    ctx.translate(position.x, position.y);
-    ctx.rotate((style.rotation * Math.PI) / 180);
-    text.forEach((line, index) => ctx.fillText(line, 0, (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
-  } else {
-    text.forEach((line, index) => ctx.fillText(line, position.x, position.y + (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
-  }
   if (selected === field) {
-    const left = style.align === "left" ? position.x : style.align === "right" ? position.x - style.width : position.x - style.width / 2;
-    const top = position.y - style.height;
+    const fontSize = Number(ctx.font.match(/([\d.]+)px/)?.[1]) || 20;
+    const lineHeight = style.lineHeight ?? fontSize;
+    const textWidth = Math.min(style.width, Math.max(1, ...text.map((line) => ctx.measureText(line).width)));
+    const boxWidth = textWidth + 24;
+    const left = style.align === "left" ? position.x - 12 : style.align === "right" ? position.x - textWidth - 12 : position.x - boxWidth / 2;
+    const top = position.y - ((text.length - 1) * lineHeight) / 2 - fontSize - 6;
+    const boxHeight = (text.length - 1) * lineHeight + fontSize * 1.3 + 12;
     ctx.beginPath();
-    ctx.roundRect(left, top, style.width, style.height + 12, 8);
+    ctx.roundRect(left, top, boxWidth, boxHeight, 8);
     ctx.fillStyle = "rgba(8,17,31,.2)";
     ctx.fill();
     ctx.setLineDash([8, 5]);
@@ -778,10 +819,14 @@ function drawTextLayer(
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(position.x, position.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = "#38bdf8";
-    ctx.fill();
+  }
+  ctx.fillStyle = style.color;
+  if (style.rotation) {
+    ctx.translate(position.x, position.y);
+    ctx.rotate((style.rotation * Math.PI) / 180);
+    text.forEach((line, index) => ctx.fillText(line, 0, (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
+  } else {
+    text.forEach((line, index) => ctx.fillText(line, position.x, position.y + (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
   }
   ctx.restore();
 }
@@ -827,19 +872,19 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams, selectedText?
   const rightText = t.design === "love-garden-couple" || t.design === "love-blossoms";
   const center = split ? 290 : rightText ? 776 : CARD_W / 2;
   const maxWidth = split ? 465 : rightText ? 380 : 760;
-  drawTextLayer(ctx, "brand", selectedText, ["RAMO  /  GIFT CARD"], positions.brand!, { font: `700 21px ${FONT}`, align: "left", color: colors.brand!, width: 290, height: 30 });
-  drawTextLayer(ctx, "category", selectedText, [translate(p.language, `cat.${t.category}`)], positions.category!, { font: `600 19px ${FONT}`, align: "right", direction: rtl ? "rtl" : "ltr", color: colors.category!, width: 240, height: 28 });
-  drawTextLayer(ctx, "receiver", selectedText, [p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty")], positions.receiver!, { font: `800 ${split ? 42 : 34}px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.receiver!, width: maxWidth, height: split ? 56 : 48 });
-  drawTextLayer(ctx, "sender", selectedText, [p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty")], positions.sender!, { font: `500 21px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.sender!, width: maxWidth, height: 34 });
-  drawTextLayer(ctx, "amount", selectedText, [`${p.amount || "0"} ${p.token}`], positions.amount!, { font: `800 ${split ? 72 : 66}px ${FONT}`, align: "center", color: colors.amount!, width: maxWidth, height: 84 });
+  drawTextLayer(ctx, "brand", selectedText, ["RAMO  /  GIFT CARD"], positions.brand!, { font: `700 21px ${FONT}`, align: "left", color: colors.brand!, width: 290 });
+  drawTextLayer(ctx, "category", selectedText, [translate(p.language, `cat.${t.category}`)], positions.category!, { font: `600 19px ${FONT}`, align: "right", direction: rtl ? "rtl" : "ltr", color: colors.category!, width: 240 });
+  drawTextLayer(ctx, "receiver", selectedText, [p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty")], positions.receiver!, { font: `800 ${split ? 42 : 34}px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.receiver!, width: maxWidth });
+  drawTextLayer(ctx, "sender", selectedText, [p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty")], positions.sender!, { font: `500 21px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.sender!, width: maxWidth });
+  drawTextLayer(ctx, "amount", selectedText, [`${p.amount || "0"} ${p.token}`], positions.amount!, { font: `800 ${split ? 72 : 66}px ${FONT}`, align: "center", color: colors.amount!, width: maxWidth });
   const cardFont = FONT_FAMILIES[p.cardFont] || FONT_FAMILIES.modern;
   const textSize = Math.max(16, Math.min(38, Number(p.cardTextSize) || 23));
   const rotation = Math.max(-12, Math.min(12, Number(p.cardTextRotation) || 0));
   ctx.font = `400 ${textSize}px ${cardFont}`;
   ctx.direction = rtl ? "rtl" : "ltr";
   const messageLines = wrapLines(ctx, p.cardText || translate(p.language, "card.default"), maxWidth - 30, 2, p.language);
-  drawTextLayer(ctx, "message", selectedText, messageLines, positions.message!, { font: `400 ${textSize}px ${cardFont}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.message!, width: maxWidth - 30, height: textSize * 2.8, rotation, lineHeight: textSize * 1.42 });
-  drawTextLayer(ctx, "network", selectedText, ["BNB SMART CHAIN"], positions.network!, { font: `500 16px ${FONT}`, align: "center", color: colors.network!, width: 270, height: 25 });
+  drawTextLayer(ctx, "message", selectedText, messageLines, positions.message!, { font: `400 ${textSize}px ${cardFont}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.message!, width: maxWidth - 30, rotation, lineHeight: textSize * 1.42 });
+  drawTextLayer(ctx, "network", selectedText, ["BNB SMART CHAIN"], positions.network!, { font: `500 16px ${FONT}`, align: "center", color: colors.network!, width: 270 });
 }
 
 export async function cardPngBase64(p: CardParams): Promise<string> {
