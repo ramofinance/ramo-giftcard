@@ -1,5 +1,6 @@
 // Talks to the sender's own wallet (Rabby, MetaMask, Trust...) through the standard browser provider.
 // We never see the sender's keys: every payment is approved inside their wallet.
+import { translate, type Language } from "./i18n";
 
 const BSC = {
   chainId: "0x38",
@@ -66,12 +67,12 @@ export async function bnbBalance(owner: string): Promise<bigint> {
   return BigInt(await provider().request({ method: "eth_getBalance", params: [owner, "latest"] }));
 }
 
-export const walletErrorText = (e: any): string | null => {
-  if (e?.code === 4001 || e?.code === "ACTION_REJECTED") return "در کیف پول لغو شد.";
-  if (e?.message === "no_wallet") return "کیف پولی پیدا نشد.";
-  if (e?.message === "tx_failed") return "تراکنش در شبکه ناموفق بود.";
-  if (e?.message === "tx_timeout") return "تایید تراکنش بیش از حد طول کشید. کمی بعد دوباره از «ادامه‌ی سفارش» استفاده کنید.";
-  if (e?.message === "insufficient_token") return "موجودی توکن کیف شما برای هدیه + کارمزد کافی نیست.";
-  if (e?.message === "insufficient_bnb") return "برای کارمزد شبکه (و BNB هدیه) موجودی BNB کافی ندارید.";
+export const walletErrorText = (e: any, language: Language = "fa"): string | null => {
+  if (e?.code === 4001 || e?.code === "ACTION_REJECTED") return translate(language, "error.cancelled");
+  if (e?.message === "no_wallet") return translate(language, "error.noWallet");
+  if (e?.message === "tx_failed") return translate(language, "error.txFailed");
+  if (e?.message === "tx_timeout") return translate(language, "error.txTimeout");
+  if (e?.message === "insufficient_token") return translate(language, "error.insufficient_token");
+  if (e?.message === "insufficient_bnb") return translate(language, "error.insufficient_bnb");
   return null;
 };

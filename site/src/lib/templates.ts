@@ -70,6 +70,11 @@ export const TEMPLATES: Template[] = [
   make(22, "congrats", "جشن رنگ‌ها", ["#b9dbf2", "#8dafe0", "#cab8df"], "congrats-confetti", "poster", "#263d63", "#ed7b67"),
   make(31, "love", "پرنده‌های عاشق", ["#d8eff7", "#c5e4eb", "#f0d2c5"], "love-birds", "split", "#29445a", "#d96857"),
   make(32, "love", "نامه‌ی عاشقانه", ["#f4ded9", "#f0c4ca", "#d6b5ca"], "love-letter", "poster", "#603d4b", "#b24f67"),
+  make(33, "love", "قولِ رزگلد", ["#542037", "#8a3547", "#efd6a7"], "love-rose-frame", "poster", "#56333a", "#b27c42"),
+  make(34, "love", "باغِ خیال", ["#eee3d2", "#d8c5a7", "#87927a"], "love-garden-couple", "poster", "#3b342a", "#547451"),
+  make(35, "love", "زیر شکوفه‌ها", ["#f2e2c8", "#e8d3b7", "#d4b8a5"], "love-blossoms", "poster", "#49382f", "#bc795e"),
+  make(36, "love", "قلبِ ستاره‌ای", ["#351427", "#6d2639", "#dca78f"], "love-stardust-heart", "poster", "#fff0e7", "#f2c995", false),
+  make(37, "love", "پیوند پارسی", ["#eee2ce", "#d8c6ab", "#839180"], "love-persian-wedding", "split", "#45392f", "#ac795b"),
   make(41, "eid", "ماه و فانوس", ["#173a43", "#0f5357", "#b7894e"], "eid-lanterns", "split", "#fff0cc", "#eac276", false),
   make(42, "eid", "باغ شبانه", ["#202742", "#35375b", "#956c67"], "eid-garden", "poster", "#fff0d2", "#e7bd72", false),
   make(51, "success", "کلاه و کتاب", ["#e1e8d3", "#bbd0b7", "#92b8b6"], "success-book", "split", "#344d49", "#b37843"),
@@ -92,7 +97,8 @@ export const getTemplate = (id: number): Template => {
   if (Number.isInteger(id) && id >= 1 && id <= 100) {
     const category = Math.floor((id - 1) / 10);
     const variant = (id - 1) % 10 >= 5 ? 1 : 0;
-    return TEMPLATES[category * 2 + variant] ?? TEMPLATES[0];
+    const categoryTemplates = TEMPLATES.filter((template) => CATEGORIES[category]?.key === template.category);
+    return categoryTemplates[variant] ?? categoryTemplates[0] ?? TEMPLATES[0];
   }
   return TEMPLATES[0];
 };

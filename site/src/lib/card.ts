@@ -1,11 +1,31 @@
 import type { Template } from "./templates";
+import type { CardFont } from "./types";
+import { translate, type Language } from "./i18n";
 import romanticBirdsUrl from "../assets/love-birds.png";
+import roseFrameUrl from "../assets/love-rose-frame.jpg";
+import gardenCoupleUrl from "../assets/love-garden-couple.jpg";
+import blossomsUrl from "../assets/love-blossoms.jpg";
+import stardustHeartUrl from "../assets/love-stardust-heart.jpg";
+import persianWeddingUrl from "../assets/love-persian-wedding.jpg";
 
 export const CARD_W = 1000;
 export const CARD_H = 625;
 const FONT = "Vazirmatn, Tahoma, sans-serif";
-let romanticBirds: HTMLImageElement | null = null;
-let romanticBirdsLoading: Promise<void> | null = null;
+const ARTWORK_URLS: Record<string, string> = {
+  "love-birds": romanticBirdsUrl,
+  "love-rose-frame": roseFrameUrl,
+  "love-garden-couple": gardenCoupleUrl,
+  "love-blossoms": blossomsUrl,
+  "love-stardust-heart": stardustHeartUrl,
+  "love-persian-wedding": persianWeddingUrl
+};
+const artwork = new Map<string, HTMLImageElement>();
+const artworkLoading = new Map<string, Promise<void>>();
+const FONT_FAMILIES: Record<CardFont, string> = {
+  modern: "Vazirmatn, 'Noto Sans SC', Tahoma, sans-serif",
+  classic: "'Noto Serif', 'Noto Serif SC', Georgia, serif",
+  clean: "Arial, 'Noto Sans SC', Tahoma, sans-serif"
+};
 
 export type CardParams = {
   template: Template;
@@ -14,30 +34,43 @@ export type CardParams = {
   amount: string;
   token: string;
   cardText: string;
+  cardFont: CardFont;
+  cardTextSize: number;
+  cardTextRotation: number;
+  language: Language;
 };
 
-export async function ensureFont() {
+export async function ensureFont(template?: Template) {
   try {
-    await Promise.all([document.fonts.load("800 40px Vazirmatn"), document.fonts.load("400 30px Vazirmatn"), loadRomanticBirds()]);
+    await Promise.all([
+      document.fonts.load("800 40px Vazirmatn"),
+      document.fonts.load("400 30px Vazirmatn"),
+      document.fonts.load("400 30px 'Noto Sans SC'"),
+      document.fonts.load("400 30px 'Noto Serif SC'"),
+      template ? loadArtwork(template.design) : Promise.resolve()
+    ]);
   } catch {
     // fall back to the system font
   }
 }
 
-function loadRomanticBirds(): Promise<void> {
-  if (romanticBirds?.complete && romanticBirds.naturalWidth > 0) return Promise.resolve();
-  if (!romanticBirdsLoading) {
-    romanticBirdsLoading = new Promise((resolve) => {
+function loadArtwork(design: string): Promise<void> {
+  const source = ARTWORK_URLS[design];
+  if (!source) return Promise.resolve();
+  if (artwork.get(design)?.complete && artwork.get(design)?.naturalWidth) return Promise.resolve();
+  if (!artworkLoading.has(design)) {
+    artworkLoading.set(design, new Promise((resolve) => {
       const image = new Image();
-      image.onload = () => { romanticBirds = image; resolve(); };
+      image.onload = () => { artwork.set(design, image); resolve(); };
       image.onerror = () => resolve();
-      image.src = romanticBirdsUrl;
-    });
+      image.src = source;
+    }));
   }
-  return romanticBirdsLoading;
+  return artworkLoading.get(design)!;
 }
 
 function drawReferenceBirds(ctx: CanvasRenderingContext2D) {
+  const romanticBirds = artwork.get("love-birds");
   if (!romanticBirds?.naturalWidth) return false;
   const art = document.createElement("canvas");
   art.width = 430;
@@ -64,6 +97,35 @@ function drawReferenceBirds(ctx: CanvasRenderingContext2D) {
   ctx.globalAlpha = 0.96;
   ctx.drawImage(art, 530, 116, 450, 372);
   ctx.restore();
+  return true;
+}
+
+function drawPhotoArtwork(ctx: CanvasRenderingContext2D, design: string) {
+  const image = artwork.get(design);
+  if (!image?.naturalWidth) return false;
+  if (design === "love-persian-wedding") {
+    const size = 420;
+    ctx.save();
+    ctx.shadowColor = "rgba(34,22,17,.3)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    ctx.fillStyle = "#f5ead7";
+    ctx.beginPath();
+    ctx.roundRect(522, 92, size, size, 26);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.beginPath();
+    ctx.roundRect(522, 92, size, size, 26);
+    ctx.clip();
+    const inset = 8;
+    ctx.drawImage(image, 522 + inset, 92 + inset, size - inset * 2, size - inset * 2);
+    ctx.restore();
+    return true;
+  }
+  const scale = Math.max(CARD_W / image.naturalWidth, CARD_H / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  ctx.drawImage(image, (CARD_W - width) / 2, (CARD_H - height) / 2, width, height);
   return true;
 }
 
@@ -431,6 +493,18 @@ function drawArtwork(ctx: CanvasRenderingContext2D, t: Template) {
       ctx.restore();
       break;
     }
+    case "love-rose-frame":
+    case "love-garden-couple":
+    case "love-blossoms":
+    case "love-stardust-heart":
+      if (!drawPhotoArtwork(ctx, t.design)) drawHeart(ctx, 760, 310, 112, accent, ink);
+      break;
+    case "love-persian-wedding":
+      if (!drawPhotoArtwork(ctx, t.design)) {
+        wash(ctx, 745, 310, 236, 220, "#fff1dc", 0.55);
+        drawFlower(ctx, 785, 310, 96, "#d68c9b", "#e6c477", ink);
+      }
+      break;
     case "eid-lanterns": {
       wash(ctx, 760, 223, 265, 237, "#e6ca7e", 0.22);
       ctx.beginPath(); ctx.arc(779, 212, 115, 0, Math.PI * 2); ctx.fillStyle = "#f2d892"; ctx.fill();
@@ -589,7 +663,18 @@ function drawArtwork(ctx: CanvasRenderingContext2D, t: Template) {
   ctx.restore();
 }
 
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number, language: Language): string[] {
+  if (language === "zh") {
+    const lines: string[] = [];
+    let line = "";
+    for (const character of Array.from(text.trim())) {
+      const next = line + character;
+      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = character; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    return lines.slice(0, maxLines);
+  }
   const words = text.trim().split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -605,6 +690,7 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const t = p.template;
+  const rtl = p.language === "fa" || p.language === "ar";
   const background = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
   background.addColorStop(0, t.colors[0]);
   background.addColorStop(0.52, t.colors[1]);
@@ -626,6 +712,15 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  const photoHeader = ["love-rose-frame", "love-garden-couple", "love-blossoms", "love-stardust-heart"].includes(t.design);
+  if (photoHeader) {
+    ctx.fillStyle = t.paper ? "rgba(255,255,255,.82)" : "rgba(7,15,28,.62)";
+    ctx.beginPath();
+    ctx.roundRect(39, 37, 270, 40, 12);
+    ctx.roundRect(CARD_W - 279, 37, 240, 40, 12);
+    ctx.fill();
+  }
+
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
   ctx.direction = "ltr";
@@ -633,40 +728,50 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
   ctx.fillStyle = t.paper ? t.ink : "#fff0d3";
   ctx.fillText("RAMO  /  GIFT CARD", 52, 66);
   ctx.textAlign = "right";
-  ctx.direction = "rtl";
+  ctx.direction = rtl ? "rtl" : "ltr";
   ctx.font = `600 19px ${FONT}`;
   ctx.fillStyle = rgba(t.paper ? t.ink : "#fff6e7", 0.78);
-  ctx.fillText(t.categoryName, CARD_W - 54, 66);
+  ctx.fillText(translate(p.language, `cat.${t.category}`), CARD_W - 54, 66);
 
   const split = t.layout === "split";
-  const center = split ? 290 : CARD_W / 2;
-  const maxWidth = split ? 465 : 760;
-  const receiverY = split ? 226 : 337;
-  const senderY = split ? 278 : 379;
-  const amountY = split ? 375 : 462;
-  const messageY = split ? 438 : 518;
+  const rightText = t.design === "love-garden-couple" || t.design === "love-blossoms";
+  const center = split ? 290 : rightText ? 776 : CARD_W / 2;
+  const maxWidth = split ? 465 : rightText ? 380 : 760;
+  const receiverY = split ? 226 : rightText ? 229 : 337;
+  const senderY = split ? 278 : rightText ? 275 : 379;
+  const amountY = split ? 375 : rightText ? 351 : 462;
+  const messageY = split ? 438 : rightText ? 416 : 518;
   const footerY = 584;
   const fillText = (text: string, y: number, size: number, weight: number, color = t.ink) => {
     ctx.textAlign = "center";
-    ctx.direction = "rtl";
+    ctx.direction = rtl ? "rtl" : "ltr";
     ctx.font = `${weight} ${size}px ${FONT}`;
     ctx.fillStyle = color;
     ctx.fillText(text, center, y, maxWidth);
   };
 
-  fillText(p.receiverName ? `برای ${p.receiverName}` : "برای ...", receiverY, split ? 42 : 39, 800);
-  fillText(p.senderName ? `از طرف ${p.senderName}` : "از طرف ...", senderY, 23, 500, rgba(t.ink, 0.78));
+  fillText(p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty"), receiverY, split ? 42 : 34, 800);
+  fillText(p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty"), senderY, 21, 500, rgba(t.ink, 0.78));
   ctx.textAlign = "center";
   ctx.direction = "ltr";
   ctx.font = `800 ${split ? 72 : 66}px ${FONT}`;
   ctx.fillStyle = t.ink;
   ctx.fillText(`${p.amount || "0"} ${p.token}`, center, amountY, maxWidth);
-  ctx.font = `400 23px ${FONT}`;
-  ctx.direction = "rtl";
-  wrapLines(ctx, p.cardText || "یک هدیه‌ی کوچک برای تو", maxWidth - 30, 2).forEach((line, index) => {
+  const cardFont = FONT_FAMILIES[p.cardFont] || FONT_FAMILIES.modern;
+  const textSize = Math.max(16, Math.min(38, Number(p.cardTextSize) || 23));
+  const rotation = Math.max(-12, Math.min(12, Number(p.cardTextRotation) || 0));
+  ctx.font = `400 ${textSize}px ${cardFont}`;
+  ctx.direction = rtl ? "rtl" : "ltr";
+  const messageLines = wrapLines(ctx, p.cardText || translate(p.language, "card.default"), maxWidth - 30, 2, p.language);
+  ctx.save();
+  ctx.translate(center, messageY);
+  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.textAlign = "center";
+  messageLines.forEach((line, index) => {
     ctx.fillStyle = rgba(t.ink, 0.9);
-    ctx.fillText(line, center, messageY + index * 32);
+    ctx.fillText(line, 0, (index - (messageLines.length - 1) / 2) * textSize * 1.42, maxWidth - 30);
   });
+  ctx.restore();
   ctx.font = `500 16px ${FONT}`;
   ctx.direction = "ltr";
   ctx.fillStyle = rgba(t.paper ? t.ink : "#fff0d3", 0.64);
@@ -674,7 +779,7 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
 }
 
 export async function cardPngBase64(p: CardParams): Promise<string> {
-  await ensureFont();
+  await ensureFont(p.template);
   const canvas = document.createElement("canvas");
   canvas.width = CARD_W;
   canvas.height = CARD_H;

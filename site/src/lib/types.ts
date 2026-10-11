@@ -1,4 +1,5 @@
 export type TokenSymbol = "USDT" | "USDC";
+export type CardFont = "modern" | "classic" | "clean";
 
 export type Config = {
   chainId: number;
@@ -16,6 +17,9 @@ export type Form = {
   receiverName: string;
   receiverId: string;
   cardText: string;
+  cardFont: CardFont;
+  cardTextSize: number;
+  cardTextRotation: number;
   message: string;
   token: TokenSymbol;
   amount: string;

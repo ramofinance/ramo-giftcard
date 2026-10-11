@@ -1,4 +1,5 @@
 import { authHeaders } from "./telegram";
+import { translate, type Language } from "./i18n";
 
 const API = (import.meta.env.VITE_API_URL as string | undefined) || "https://ramo-giftcard-api.rahbarmohsen87.workers.dev";
 
@@ -26,19 +27,10 @@ export async function api<T>(path: string, opts: { body?: unknown; auth?: boolea
   return data as T;
 }
 
-const MESSAGES: Record<string, string> = {
-  network: "ارتباط با سرور برقرار نشد. اینترنت را بررسی کنید.",
-  auth: "ابتدا با تلگرام وارد شوید.",
-  receiver_not_started: "گیرنده هنوز ربات را استارت نکرده است.",
-  bad_amount: "مبلغ مجاز نیست.",
-  bad_receiver: "شناسه‌ی گیرنده درست نیست.",
-  draft_expired: "مهلت این سفارش تمام شده است. عبارت بازیابی را ذخیره کنید و با پشتیبانی تماس بگیرید.",
-  payment_failed: "یکی از تراکنش‌ها ناموفق بود.",
-  gift_payment_mismatch: "تراکنش هدیه با سفارش نمی‌خواند.",
-  fee_payment_mismatch: "تراکنش کارمزد با سفارش نمی‌خواند.",
-  gas_payment_mismatch: "تراکنش BNB با سفارش نمی‌خواند.",
-  tx_reused: "این تراکنش‌ها قبلاً برای سفارش دیگری استفاده شده‌اند.",
-  rpc_unavailable: "شبکه‌ی BNB Chain الان پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید.",
-  not_configured: "سرویس هنوز کامل راه‌اندازی نشده است."
+export const errorText = (e: unknown, language: Language = "fa") => {
+  if (e instanceof ApiError) {
+    const message = translate(language, `error.${e.code}`);
+    return message.startsWith("error.") ? translate(language, "error.unknown") : message;
+  }
+  return translate(language, "error.unknown");
 };
-export const errorText = (e: unknown) => (e instanceof ApiError ? MESSAGES[e.code] || `خطا (${e.code})` : e instanceof Error ? e.message : "خطای ناشناخته");

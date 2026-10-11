@@ -4,6 +4,7 @@ import { cardPngBase64 } from "./card";
 import { getTemplate } from "./templates";
 import type { DeliverResult, Draft, Form, Pending } from "./types";
 import { bnbBalance, sendBnb, sendToken, tokenBalance, waitForReceipt } from "./wallet";
+import type { Language } from "./i18n";
 
 export type Step = "check" | "gift" | "fee" | "gas" | "deliver";
 
@@ -33,7 +34,7 @@ export async function createPending(form: Form, templateId: number, senderWallet
 
 // Step 2: pay from the sender's wallet, then ask the server to deliver. Safe to run again after an interruption:
 // payments that already have a hash are never sent twice.
-export async function runPayment(p: Pending, onStep: (s: Step) => void): Promise<DeliverResult> {
+export async function runPayment(p: Pending, onStep: (s: Step) => void, language: Language = "fa"): Promise<DeliverResult> {
   const gift = BigInt(p.draft.amountUnits);
   const fee = BigInt(p.draft.feeUnits);
   const gas = BigInt(p.draft.gasWei);
@@ -66,7 +67,11 @@ export async function runPayment(p: Pending, onStep: (s: Step) => void): Promise
     receiverName: p.form.receiverName,
     amount: p.form.amount,
     token: p.form.token,
-    cardText: p.form.cardText
+    cardText: p.form.cardText,
+    cardFont: p.form.cardFont || "modern",
+    cardTextSize: p.form.cardTextSize || 23,
+    cardTextRotation: p.form.cardTextRotation || 0,
+    language
   });
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
