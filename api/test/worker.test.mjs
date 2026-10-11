@@ -66,12 +66,13 @@ const H = (n) => "0x" + n.toString(16).padStart(64, "0");
 chain[H(1)] = { receipt: receipt(SENDER, GIFTW, d.amountUnits) };
 chain[H(2)] = { receipt: receipt(SENDER, FEE, d.feeUnits) };
 chain[H(3)] = { receipt: { status: "0x1", blockNumber: "0x3de", logs: [] }, tx: { from: SENDER.toUpperCase().replace("0X","0x"), to: GIFTW, value: "0x38d7ea4c68000", input: "0x" } };
-const payload = (extra = {}) => ({ code: d.code, senderName: "علی <b>x</b>", receiverName: "Sara", message: "تولدت مبارک & <script>", templateId: 7, address: GIFTW, senderWallet: SENDER, mnemonic: MN, txs: { gift: H(1), fee: H(2), gas: H(3) }, cardPng: "iVBORw0KGgoAAAANSUhEUg==", ...extra });
+const payload = (extra = {}) => ({ code: d.code, senderName: "علی <b>x</b>", receiverName: "Sara", message: "تولدت مبارک & <script>", templateId: 7, address: GIFTW, senderWallet: SENDER, mnemonic: MN, txs: { gift: H(1), fee: H(2), gas: H(3) }, cardPng: "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/", ...extra });
 
 // 3. deliver: failure paths first
 r = await call("POST", "/api/gift/deliver", payload(), B); ok("another Telegram user cannot use my order -> 403", r.status === 403);
 r = await call("POST", "/api/gift/deliver", payload({ mnemonic: "not a real phrase" }), A); ok("bad phrase rejected", r.status === 400 && r.json.error === "bad_phrase");
-r = await call("POST", "/api/gift/deliver", payload({ cardPng: "PHNjcmlwdD4=" }), A); ok("non-PNG card rejected", r.status === 400);
+r = await call("POST", "/api/gift/deliver", payload({ cardPng: "PHNjcmlwdD4=" }), A); ok("non-image card rejected", r.status === 400);
+r = await call("POST", "/api/gift/deliver", payload({ cardPng: "iVBORw0KGgo" + "A".repeat(1000100) }), A); ok("oversized card rejected", r.status === 400 && r.json.error === "bad_card");
 head = 991; r = await call("POST", "/api/gift/deliver", payload(), A); ok("not enough confirmations -> 409 pending", r.status === 409 && r.json.error === "pending");
 head = 1000;
 chain[H(2)] = { receipt: receipt(SENDER, FEE, 500000000000000000n) };

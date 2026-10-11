@@ -1,0 +1,10 @@
+# Optional: only needed if you deploy from the command line (npx wrangler deploy).
+# You can also paste worker.js into the Cloudflare dashboard editor; no build step is needed.
+name = "ramo-giftcard-api"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+keep_vars = true   # never wipe the variables/secrets you set in the dashboard
+
+[[kv_namespaces]]
+binding = "GIFT_KV"
+id = "54443a4d33504a83acbd147378ba7933"

@@ -110,7 +110,8 @@ async function sendCard(env, chat, pngBase64, caption) {
     form.append("chat_id", String(chat));
     form.append("caption", caption);
     form.append("parse_mode", "HTML");
-    form.append("photo", new Blob([bytes], { type: "image/png" }), "gift.png");
+    const jpeg = pngBase64.startsWith("/9j/");
+    form.append("photo", new Blob([bytes], { type: jpeg ? "image/jpeg" : "image/png" }), jpeg ? "gift.jpg" : "gift.png");
     const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendPhoto`, { method: "POST", body: form });
     return await res.json();
   } catch { return { ok: false }; }
@@ -253,7 +254,8 @@ async function handleDeliver(request, env, user, reply) {
   if (!ADDR.test(address) || !ADDR.test(senderWallet)) return reply({ error: "bad_address" }, 400);
   if (!WORDS.test(mnemonic)) return reply({ error: "bad_phrase" }, 400);
   if (!HASH.test(txs.gift || "") || !HASH.test(txs.fee || "") || (draft.gasWei !== "0" && !HASH.test(txs.gas || ""))) return reply({ error: "bad_txs" }, 400);
-  if (png && (png.length > 700000 || !png.startsWith("iVBORw0KGgo"))) return reply({ error: "bad_card" }, 400);
+  // the card image: JPEG (what the site sends) or PNG, at most ~750 KB
+  if (png && (png.length > 1000000 || !(png.startsWith("/9j/") || png.startsWith("iVBORw0KGgo")))) return reply({ error: "bad_card" }, 400);
 
   const hashes = [txs.gift, txs.fee, draft.gasWei !== "0" ? txs.gas : null].filter(Boolean).map((h) => h.toLowerCase());
   if (new Set(hashes).size !== hashes.length) return reply({ error: "bad_txs" }, 400);

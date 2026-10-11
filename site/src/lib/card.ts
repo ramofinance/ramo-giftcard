@@ -948,5 +948,7 @@ export async function cardPngBase64(p: CardParams): Promise<string> {
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   drawCard(canvas, p);
-  return canvas.toDataURL("image/png").split(",")[1];
+  // JPEG, not PNG: photo cards are 1-1.7 MB as PNG (over the Worker limit) but about 150-300 KB as JPEG.
+  // The canvas is fully painted (no transparency), so nothing is lost.
+  return canvas.toDataURL("image/jpeg", 0.92).split(",")[1];
 }
