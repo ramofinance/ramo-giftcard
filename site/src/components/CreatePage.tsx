@@ -6,6 +6,8 @@ import { api, errorText } from "../lib/api";
 import { clearPending, createPending, loadPending, runPayment } from "../lib/flow";
 import type { Step } from "../lib/flow";
 import { getTemplate } from "../lib/templates";
+import type { CardTextField, CardTextPosition } from "../lib/templates";
+import { defaultCardTextColors, defaultCardTextPositions } from "../lib/card";
 import { BOT, currentUser, inMiniApp } from "../lib/telegram";
 import { DEFAULT_CONFIG } from "../lib/types";
 import type { Config, DeliverResult, Form, Pending } from "../lib/types";
@@ -14,6 +16,7 @@ import { connectWallet, hasWallet, walletErrorText } from "../lib/wallet";
 import { useLanguage } from "../lib/i18n";
 
 type Done = { result: DeliverResult; mnemonic: string; address: string; txs: Pending["txs"]; receiverName: string };
+const TEXT_FIELDS: CardTextField[] = ["brand", "category", "receiver", "sender", "amount", "message", "network"];
 
 export default function CreatePage() {
   const { language, t } = useLanguage();
@@ -24,6 +27,7 @@ export default function CreatePage() {
   const [user, setUser] = useState(currentUser());
   const [account, setAccount] = useState("");
   const [form, setForm] = useState<Form>({ senderName: "", receiverName: "", receiverId: "", cardText: "", cardFont: "modern", cardTextSize: 23, cardTextRotation: 0, message: "", token: "USDT", amount: "10", gas: true });
+  const [selectedText, setSelectedText] = useState<CardTextField>("receiver");
   const [reach, setReach] = useState<"idle" | "ok" | "no">("idle");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<Step | null>(null);
@@ -40,6 +44,12 @@ export default function CreatePage() {
   ];
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const defaultPositions = defaultCardTextPositions(template);
+  const defaultColors = defaultCardTextColors(template);
+  const textPositions = { ...defaultPositions, ...form.cardTextPositions };
+  const textColors = { ...defaultColors, ...form.cardTextColors };
+  const position = textPositions[selectedText]!;
+  const updatePosition = (field: CardTextField, value: CardTextPosition) => set("cardTextPositions", { ...defaultCardTextPositions(template), ...form.cardTextPositions, [field]: value });
 
   useEffect(() => {
     api<Config>("/api/config", { auth: false }).then(setCfg).catch(() => {});
@@ -145,7 +155,7 @@ export default function CreatePage() {
   return (
     <div className="create">
       <section className="create-preview">
-        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} language={language} />
+        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} cardTextPositions={textPositions} cardTextColors={textColors} selectedText={selectedText} onTextPositionChange={updatePosition} language={language} />
         <div className="row between">
           <span className="dim small">{t("create.template")}: {t(`tpl.${template.design}`)}</span>
           <Link to="/templates" className="small">{t("create.change")}</Link>
@@ -209,6 +219,29 @@ export default function CreatePage() {
         <label className="range-field"><span className="range-label"><span>{t("create.rotation")}</span><b>{form.cardTextRotation > 0 ? `+${form.cardTextRotation}` : form.cardTextRotation}°</b></span>
           <input type="range" min="-12" max="12" value={form.cardTextRotation} onChange={(e) => set("cardTextRotation", Number(e.target.value))} />
         </label>
+        <div className="text-editor">
+          <h3>{t("create.textEditorTitle")}</h3>
+          <p className="editor-hint">{t("create.textEditorHint")}</p>
+          <label>{t("create.textLayer")}
+            <select value={selectedText} onChange={(e) => setSelectedText(e.target.value as CardTextField)}>
+              {TEXT_FIELDS.map((field) => <option key={field} value={field}>{t(`create.layer.${field}`)}</option>)}
+            </select>
+          </label>
+          <label className="color-field">{t("create.textColor")}
+            <input type="color" value={textColors[selectedText]!} onChange={(e) => set("cardTextColors", { ...defaultColors, ...form.cardTextColors, [selectedText]: e.target.value })} />
+          </label>
+          <div className="text-controls">
+            <label className="range-field"><span className="range-label"><span>{t("create.positionX")}</span><b>{position.x}px</b></span>
+              <input type="range" min="0" max="1000" value={position.x} onChange={(e) => updatePosition(selectedText, { ...position, x: Number(e.target.value) })} />
+            </label>
+            <label className="range-field"><span className="range-label"><span>{t("create.positionY")}</span><b>{position.y}px</b></span>
+              <input type="range" min="0" max="625" value={position.y} onChange={(e) => updatePosition(selectedText, { ...position, y: Number(e.target.value) })} />
+            </label>
+          </div>
+          <div className="editor-actions">
+            <button type="button" className="btn ghost" onClick={() => updatePosition(selectedText, defaultPositions[selectedText]!)}>{t("create.resetPosition")}</button>
+          </div>
+        </div>
         <label>{t("create.personalMessage")}<textarea rows={3} maxLength={300} value={form.message} onChange={(e) => set("message", e.target.value)} /></label>
 
         <label className="check">

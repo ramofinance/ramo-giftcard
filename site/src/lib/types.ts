@@ -1,3 +1,5 @@
+import type { CardTextColors, CardTextPositions } from "./templates";
+
 export type TokenSymbol = "USDT" | "USDC";
 export type CardFont = "modern" | "classic" | "clean";
 
@@ -20,6 +22,8 @@ export type Form = {
   cardFont: CardFont;
   cardTextSize: number;
   cardTextRotation: number;
+  cardTextPositions?: CardTextPositions;
+  cardTextColors?: CardTextColors;
   message: string;
   token: TokenSymbol;
   amount: string;

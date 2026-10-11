@@ -16,6 +16,11 @@ export type Template = {
   paper: boolean;
 };
 
+export type CardTextField = "brand" | "category" | "receiver" | "sender" | "amount" | "message" | "network";
+export type CardTextPosition = { x: number; y: number };
+export type CardTextPositions = Partial<Record<CardTextField, CardTextPosition>>;
+export type CardTextColors = Partial<Record<CardTextField, string>>;
+
 export const CATEGORIES = [
   { key: "birthday", name: "تولد", emoji: "🎂" },
   { key: "thanks", name: "تشکر", emoji: "🙏" },
@@ -64,6 +69,13 @@ function make(
 export const TEMPLATES: Template[] = [
   make(1, "birthday", "کیک خامه‌ای", ["#f4d9bd", "#eeb6a5", "#d88da0"], "birthday-cake", "split", "#55384a", "#bc5267"),
   make(2, "birthday", "بادکنک‌های رنگی", ["#d6edfa", "#a8d7ec", "#f4c8ca"], "birthday-balloons", "poster", "#28465e", "#f07869"),
+  make(3, "birthday", "جشن صورتی", ["#ead6cf", "#e6c4ba", "#bd9a7d"], "birthday-photo-1", "poster", "#634442", "#b27a62"),
+  make(4, "birthday", "کیک طلایی", ["#f3dfbd", "#d6b879", "#a27b52"], "birthday-photo-2", "poster", "#57452f", "#ad783a"),
+  make(5, "birthday", "شبِ جشن", ["#4c1b27", "#6a2431", "#9b4c3a"], "birthday-photo-3", "poster", "#fff0da", "#efc77e", false),
+  make(6, "birthday", "شکوه شمع‌ها", ["#eddbc2", "#d4bb9a", "#9b7a5d"], "birthday-photo-4", "poster", "#584533", "#a78050"),
+  make(7, "birthday", "تولد طلایی", ["#f4e6c5", "#d9c17f", "#b49751"], "birthday-photo-5", "poster", "#51432c", "#a78037"),
+  make(8, "birthday", "جشنِ ستاره‌ای", ["#272d54", "#554269", "#ba8393"], "birthday-photo-6", "poster", "#fff2e8", "#f4c77e", false),
+  make(9, "birthday", "کیک و بادکنک طلایی", ["#f4e9d1", "#e4d0a0", "#c6aa6d"], "birthday-photo-7", "poster", "#594b32", "#b48b43"),
   make(11, "thanks", "شاخه‌ی زیتون", ["#f0eedf", "#d9e3c6", "#b6c6a3"], "thanks-olive", "split", "#3b574a", "#738a61"),
   make(12, "thanks", "دسته‌گل بهاری", ["#f5e1d8", "#eec9c5", "#d9b5cf"], "thanks-bouquet", "poster", "#604452", "#ba7185"),
   make(21, "congrats", "مدال افتخار", ["#f3e1b2", "#dbb96d", "#b77849"], "congrats-medal", "split", "#51402b", "#a77331"),

@@ -1,4 +1,4 @@
-import type { Template } from "./templates";
+import type { CardTextColors, CardTextField, CardTextPositions, Template } from "./templates";
 import type { CardFont } from "./types";
 import { translate, type Language } from "./i18n";
 import romanticBirdsUrl from "../assets/love-birds.png";
@@ -7,6 +7,13 @@ import gardenCoupleUrl from "../assets/love-garden-couple.jpg";
 import blossomsUrl from "../assets/love-blossoms.jpg";
 import stardustHeartUrl from "../assets/love-stardust-heart.jpg";
 import persianWeddingUrl from "../assets/love-persian-wedding.jpg";
+import birthdayPhoto1Url from "../assets/birthday-photo-1.jpg";
+import birthdayPhoto2Url from "../assets/birthday-photo-2.jpg";
+import birthdayPhoto3Url from "../assets/birthday-photo-3.jpg";
+import birthdayPhoto4Url from "../assets/birthday-photo-4.jpg";
+import birthdayPhoto5Url from "../assets/birthday-photo-5.jpg";
+import birthdayPhoto6Url from "../assets/birthday-photo-6.jpg";
+import birthdayPhoto7Url from "../assets/birthday-photo-7.jpg";
 
 export const CARD_W = 1000;
 export const CARD_H = 625;
@@ -17,7 +24,14 @@ const ARTWORK_URLS: Record<string, string> = {
   "love-garden-couple": gardenCoupleUrl,
   "love-blossoms": blossomsUrl,
   "love-stardust-heart": stardustHeartUrl,
-  "love-persian-wedding": persianWeddingUrl
+  "love-persian-wedding": persianWeddingUrl,
+  "birthday-photo-1": birthdayPhoto1Url,
+  "birthday-photo-2": birthdayPhoto2Url,
+  "birthday-photo-3": birthdayPhoto3Url,
+  "birthday-photo-4": birthdayPhoto4Url,
+  "birthday-photo-5": birthdayPhoto5Url,
+  "birthday-photo-6": birthdayPhoto6Url,
+  "birthday-photo-7": birthdayPhoto7Url
 };
 const artwork = new Map<string, HTMLImageElement>();
 const artworkLoading = new Map<string, Promise<void>>();
@@ -38,6 +52,8 @@ export type CardParams = {
   cardTextSize: number;
   cardTextRotation: number;
   language: Language;
+  cardTextPositions?: CardTextPositions;
+  cardTextColors?: CardTextColors;
 };
 
 export async function ensureFont(template?: Template) {
@@ -499,6 +515,17 @@ function drawArtwork(ctx: CanvasRenderingContext2D, t: Template) {
     case "love-stardust-heart":
       if (!drawPhotoArtwork(ctx, t.design)) drawHeart(ctx, 760, 310, 112, accent, ink);
       break;
+    case "birthday-photo-1":
+    case "birthday-photo-2":
+    case "birthday-photo-3":
+    case "birthday-photo-4":
+    case "birthday-photo-5":
+    case "birthday-photo-6":
+    case "birthday-photo-7":
+      drawPhotoArtwork(ctx, t.design);
+      ctx.fillStyle = "rgba(8,10,18,.08)";
+      ctx.fillRect(0, 0, CARD_W, CARD_H);
+      break;
     case "love-persian-wedding":
       if (!drawPhotoArtwork(ctx, t.design)) {
         wash(ctx, 745, 310, 236, 220, "#fff1dc", 0.55);
@@ -686,7 +713,80 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return lines.slice(0, maxLines);
 }
 
-export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
+export function defaultCardTextPositions(template: Template): CardTextPositions {
+  const split = template.layout === "split";
+  const rightText = template.design === "love-garden-couple" || template.design === "love-blossoms";
+  const center = split ? 290 : rightText ? 776 : CARD_W / 2;
+  return {
+    brand: { x: 52, y: 66 },
+    category: { x: CARD_W - 54, y: 66 },
+    receiver: { x: center, y: split ? 226 : rightText ? 229 : 337 },
+    sender: { x: center, y: split ? 278 : rightText ? 275 : 379 },
+    amount: { x: center, y: split ? 375 : rightText ? 351 : 462 },
+    message: { x: center, y: split ? 438 : rightText ? 416 : 518 },
+    network: { x: CARD_W / 2, y: 584 }
+  };
+}
+
+export function defaultCardTextColors(template: Template): CardTextColors {
+  const main = template.ink;
+  const light = template.paper ? template.ink : "#fff0d3";
+  return { brand: light, category: light, receiver: main, sender: main, amount: main, message: main, network: light };
+}
+
+type TextLayerStyle = {
+  font: string;
+  align: CanvasTextAlign;
+  color: string;
+  width: number;
+  height: number;
+  direction?: CanvasDirection;
+  rotation?: number;
+  lineHeight?: number;
+};
+
+function drawTextLayer(
+  ctx: CanvasRenderingContext2D,
+  field: CardTextField,
+  selected: CardTextField | undefined,
+  text: string[],
+  position: { x: number; y: number },
+  style: TextLayerStyle
+) {
+  ctx.save();
+  ctx.font = style.font;
+  ctx.textAlign = style.align;
+  ctx.textBaseline = "alphabetic";
+  ctx.direction = style.direction ?? "ltr";
+  ctx.fillStyle = style.color;
+  if (style.rotation) {
+    ctx.translate(position.x, position.y);
+    ctx.rotate((style.rotation * Math.PI) / 180);
+    text.forEach((line, index) => ctx.fillText(line, 0, (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
+  } else {
+    text.forEach((line, index) => ctx.fillText(line, position.x, position.y + (index - (text.length - 1) / 2) * (style.lineHeight ?? 1), style.width));
+  }
+  if (selected === field) {
+    const left = style.align === "left" ? position.x : style.align === "right" ? position.x - style.width : position.x - style.width / 2;
+    const top = position.y - style.height;
+    ctx.beginPath();
+    ctx.roundRect(left, top, style.width, style.height + 12, 8);
+    ctx.fillStyle = "rgba(8,17,31,.2)";
+    ctx.fill();
+    ctx.setLineDash([8, 5]);
+    ctx.strokeStyle = "rgba(125,211,252,.95)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(position.x, position.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+export function drawCard(canvas: HTMLCanvasElement, p: CardParams, selectedText?: CardTextField) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const t = p.template;
@@ -712,7 +812,7 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  const photoHeader = ["love-rose-frame", "love-garden-couple", "love-blossoms", "love-stardust-heart"].includes(t.design);
+  const photoHeader = ["love-rose-frame", "love-garden-couple", "love-blossoms", "love-stardust-heart", "birthday-photo-1", "birthday-photo-2", "birthday-photo-3", "birthday-photo-4", "birthday-photo-5", "birthday-photo-6", "birthday-photo-7"].includes(t.design);
   if (photoHeader) {
     ctx.fillStyle = t.paper ? "rgba(255,255,255,.82)" : "rgba(7,15,28,.62)";
     ctx.beginPath();
@@ -721,61 +821,25 @@ export function drawCard(canvas: HTMLCanvasElement, p: CardParams) {
     ctx.fill();
   }
 
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-  ctx.direction = "ltr";
-  ctx.font = `700 21px ${FONT}`;
-  ctx.fillStyle = t.paper ? t.ink : "#fff0d3";
-  ctx.fillText("RAMO  /  GIFT CARD", 52, 66);
-  ctx.textAlign = "right";
-  ctx.direction = rtl ? "rtl" : "ltr";
-  ctx.font = `600 19px ${FONT}`;
-  ctx.fillStyle = rgba(t.paper ? t.ink : "#fff6e7", 0.78);
-  ctx.fillText(translate(p.language, `cat.${t.category}`), CARD_W - 54, 66);
-
   const split = t.layout === "split";
+  const positions = { ...defaultCardTextPositions(t), ...p.cardTextPositions };
+  const colors = { ...defaultCardTextColors(t), ...p.cardTextColors };
   const rightText = t.design === "love-garden-couple" || t.design === "love-blossoms";
   const center = split ? 290 : rightText ? 776 : CARD_W / 2;
   const maxWidth = split ? 465 : rightText ? 380 : 760;
-  const receiverY = split ? 226 : rightText ? 229 : 337;
-  const senderY = split ? 278 : rightText ? 275 : 379;
-  const amountY = split ? 375 : rightText ? 351 : 462;
-  const messageY = split ? 438 : rightText ? 416 : 518;
-  const footerY = 584;
-  const fillText = (text: string, y: number, size: number, weight: number, color = t.ink) => {
-    ctx.textAlign = "center";
-    ctx.direction = rtl ? "rtl" : "ltr";
-    ctx.font = `${weight} ${size}px ${FONT}`;
-    ctx.fillStyle = color;
-    ctx.fillText(text, center, y, maxWidth);
-  };
-
-  fillText(p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty"), receiverY, split ? 42 : 34, 800);
-  fillText(p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty"), senderY, 21, 500, rgba(t.ink, 0.78));
-  ctx.textAlign = "center";
-  ctx.direction = "ltr";
-  ctx.font = `800 ${split ? 72 : 66}px ${FONT}`;
-  ctx.fillStyle = t.ink;
-  ctx.fillText(`${p.amount || "0"} ${p.token}`, center, amountY, maxWidth);
+  drawTextLayer(ctx, "brand", selectedText, ["RAMO  /  GIFT CARD"], positions.brand!, { font: `700 21px ${FONT}`, align: "left", color: colors.brand!, width: 290, height: 30 });
+  drawTextLayer(ctx, "category", selectedText, [translate(p.language, `cat.${t.category}`)], positions.category!, { font: `600 19px ${FONT}`, align: "right", direction: rtl ? "rtl" : "ltr", color: colors.category!, width: 240, height: 28 });
+  drawTextLayer(ctx, "receiver", selectedText, [p.receiverName ? translate(p.language, "card.for", { name: p.receiverName }) : translate(p.language, "card.toEmpty")], positions.receiver!, { font: `800 ${split ? 42 : 34}px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.receiver!, width: maxWidth, height: split ? 56 : 48 });
+  drawTextLayer(ctx, "sender", selectedText, [p.senderName ? translate(p.language, "card.from", { name: p.senderName }) : translate(p.language, "card.fromEmpty")], positions.sender!, { font: `500 21px ${FONT}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.sender!, width: maxWidth, height: 34 });
+  drawTextLayer(ctx, "amount", selectedText, [`${p.amount || "0"} ${p.token}`], positions.amount!, { font: `800 ${split ? 72 : 66}px ${FONT}`, align: "center", color: colors.amount!, width: maxWidth, height: 84 });
   const cardFont = FONT_FAMILIES[p.cardFont] || FONT_FAMILIES.modern;
   const textSize = Math.max(16, Math.min(38, Number(p.cardTextSize) || 23));
   const rotation = Math.max(-12, Math.min(12, Number(p.cardTextRotation) || 0));
   ctx.font = `400 ${textSize}px ${cardFont}`;
   ctx.direction = rtl ? "rtl" : "ltr";
   const messageLines = wrapLines(ctx, p.cardText || translate(p.language, "card.default"), maxWidth - 30, 2, p.language);
-  ctx.save();
-  ctx.translate(center, messageY);
-  ctx.rotate((rotation * Math.PI) / 180);
-  ctx.textAlign = "center";
-  messageLines.forEach((line, index) => {
-    ctx.fillStyle = rgba(t.ink, 0.9);
-    ctx.fillText(line, 0, (index - (messageLines.length - 1) / 2) * textSize * 1.42, maxWidth - 30);
-  });
-  ctx.restore();
-  ctx.font = `500 16px ${FONT}`;
-  ctx.direction = "ltr";
-  ctx.fillStyle = rgba(t.paper ? t.ink : "#fff0d3", 0.64);
-  ctx.fillText("BNB SMART CHAIN", CARD_W / 2, footerY);
+  drawTextLayer(ctx, "message", selectedText, messageLines, positions.message!, { font: `400 ${textSize}px ${cardFont}`, align: "center", direction: rtl ? "rtl" : "ltr", color: colors.message!, width: maxWidth - 30, height: textSize * 2.8, rotation, lineHeight: textSize * 1.42 });
+  drawTextLayer(ctx, "network", selectedText, ["BNB SMART CHAIN"], positions.network!, { font: `500 16px ${FONT}`, align: "center", color: colors.network!, width: 270, height: 25 });
 }
 
 export async function cardPngBase64(p: CardParams): Promise<string> {

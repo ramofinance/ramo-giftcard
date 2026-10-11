@@ -6,6 +6,7 @@ import TemplatesPage from "./components/TemplatesPage";
 import { loadPending } from "./lib/flow";
 import { currentUser } from "./lib/telegram";
 import { LANGUAGES, LanguageProvider, useLanguage } from "./lib/i18n";
+import logoMark from "./assets/ramo-logo-mark.jpg";
 
 function Layout() {
   useLocation(); // re-render on navigation so the banner below stays current
@@ -16,7 +17,7 @@ function Layout() {
     <div className="shell">
       <header className="top">
         <Link to="/" className="brand">
-          <span className="brand-symbol" aria-hidden="true">R</span>
+          <img className="brand-symbol" src={logoMark} alt="" aria-hidden="true" />
           <span className="brand-name">RAMO <i>GIFT</i></span>
         </Link>
         <nav>

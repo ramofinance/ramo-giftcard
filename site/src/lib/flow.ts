@@ -71,6 +71,8 @@ export async function runPayment(p: Pending, onStep: (s: Step) => void, language
     cardFont: p.form.cardFont || "modern",
     cardTextSize: p.form.cardTextSize || 23,
     cardTextRotation: p.form.cardTextRotation || 0,
+    cardTextPositions: p.form.cardTextPositions,
+    cardTextColors: p.form.cardTextColors,
     language
   });
   for (let attempt = 0; attempt < 20; attempt += 1) {
