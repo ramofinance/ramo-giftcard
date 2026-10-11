@@ -18,11 +18,11 @@ export const loadPending = (): Pending | null => {
 export const savePending = (p: Pending) => localStorage.setItem(KEY, JSON.stringify(p));
 export const clearPending = () => localStorage.removeItem(KEY);
 
-// Step 1: ask the server for an order (it also checks that the receiver can be reached on Telegram)
-// and create the gift wallet right here in the browser. The 12 words never leave this device until delivery.
+// Step 1: ask the server for an order and create the gift wallet in the browser.
+// The 12 words stay here until the buyer's Telegram delivery.
 export async function createPending(form: Form, templateId: number, senderWallet: string): Promise<Pending> {
   const draft = await api<Draft>("/api/gift/start", {
-    body: { receiverId: Number(form.receiverId), token: form.token, amount: form.amount, gas: form.gas }
+    body: { token: form.token, amount: form.amount, gas: form.gas }
   });
   const wallet = Wallet.createRandom();
   const phrase = wallet.mnemonic?.phrase;
@@ -89,7 +89,8 @@ export async function runPayment(p: Pending, onStep: (s: Step) => void, language
           senderWallet: p.senderWallet,
           mnemonic: p.mnemonic,
           txs: p.txs,
-          cardPng
+          cardPng,
+          language
         }
       });
       clearPending(); // the 12 words are wiped from this browser once delivery is done

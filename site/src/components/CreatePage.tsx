@@ -8,7 +8,7 @@ import type { Step } from "../lib/flow";
 import { getTemplate } from "../lib/templates";
 import type { CardTextField, CardTextPosition, CardTextStyle } from "../lib/templates";
 import { defaultCardTextColors, defaultCardTextPositions, defaultCardTextStyles } from "../lib/card";
-import { BOT, currentUser, inMiniApp } from "../lib/telegram";
+import { currentUser, inMiniApp } from "../lib/telegram";
 import { DEFAULT_CONFIG } from "../lib/types";
 import type { Config, DeliverResult, Form, Pending } from "../lib/types";
 import { fromUnits, shortAddress, toUnits } from "../lib/units";
@@ -26,9 +26,8 @@ export default function CreatePage() {
   const [cfg, setCfg] = useState<Config>(DEFAULT_CONFIG);
   const [user, setUser] = useState(currentUser());
   const [account, setAccount] = useState("");
-  const [form, setForm] = useState<Form>({ senderName: "", receiverName: "", receiverId: "", cardText: "", cardFont: "modern", cardTextSize: 23, cardTextRotation: 0, message: "", token: "USDT", amount: "10", gas: true });
+  const [form, setForm] = useState<Form>({ senderName: "", receiverName: "", cardText: "", cardFont: "modern", cardTextSize: 23, cardTextRotation: 0, message: "", token: "USDT", amount: "10", gas: true });
   const [selectedText, setSelectedText] = useState<CardTextField>("receiver");
-  const [reach, setReach] = useState<"idle" | "ok" | "no">("idle");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<Step | null>(null);
   const [error, setError] = useState("");
@@ -78,7 +77,6 @@ export default function CreatePage() {
 
   const validate = (): string | null => {
     if (!form.senderName.trim() || !form.receiverName.trim()) return t("create.validateNames");
-    if (!/^\d{5,15}$/.test(form.receiverId.trim())) return t("create.validateId");
     const min = toUnits(cfg.minGift);
     const max = toUnits(cfg.maxGift);
     if (giftUnits === null || (min !== null && giftUnits < min) || (max !== null && giftUnits > max)) return t("create.validateAmount", { min: cfg.minGift, max: cfg.maxGift, token: form.token });
@@ -89,14 +87,6 @@ export default function CreatePage() {
     setError(walletErrorText(e, language) ?? errorText(e, language));
     const p = loadPending();
     if (p && !p.txs.gift) { clearPending(); setPending(null); } else setPending(p); // nothing paid yet -> nothing to resume
-  };
-
-  const checkReceiver = async () => {
-    setError("");
-    try {
-      const r = await api<{ reachable: boolean }>("/api/receiver/check", { body: { receiverId: Number(form.receiverId) } });
-      setReach(r.reachable ? "ok" : "no");
-    } catch (e) { fail(e); }
   };
 
   const connect = async () => {
@@ -135,11 +125,10 @@ export default function CreatePage() {
     const r = done.result;
     return (
       <div className="panel">
-        <h1 className="page-title">{r.receiver === "sent" ? `🎉 ${t("create.sent")}` : t("create.failed")}</h1>
-        {r.receiver === "sent"
+        <h1 className="page-title">{r.buyer === "sent" ? `🎉 ${t("create.sent")}` : t("create.failed")}</h1>
+        {r.buyer === "sent"
           ? <p className="ok">{t("create.sentInfo", { name: done.receiverName })}</p>
           : <p className="error">{t("create.failedInfo")}</p>}
-        {r.sender === "sent" && <p className="dim">{t("create.senderCopy")}</p>}
         <p className="dim small">{t("create.order")}: {r.orderId}</p>
         <div className="backup">
           <strong>{t("create.backup")}</strong>
@@ -159,8 +148,6 @@ export default function CreatePage() {
 
   const needLogin = !user;
   const needWallet = !account;
-  const [receiverHintBefore, receiverHintAfter] = t("create.receiverHint").split("{bot}");
-
   return (
     <div className="create">
       <section className="create-preview">
@@ -189,17 +176,6 @@ export default function CreatePage() {
           <label>{t("create.sender")}<input value={form.senderName} maxLength={40} onChange={(e) => set("senderName", e.target.value)} /></label>
           <label>{t("create.receiver")}<input value={form.receiverName} maxLength={40} onChange={(e) => set("receiverName", e.target.value)} /></label>
         </div>
-
-        <label>
-          {t("create.receiverId")}
-          <div className="inline">
-            <input dir="ltr" inputMode="numeric" placeholder="123456789" value={form.receiverId} onChange={(e) => { set("receiverId", e.target.value.replace(/\D/g, "")); setReach("idle"); }} />
-            <button type="button" className="btn ghost" disabled={!user || form.receiverId.length < 5} onClick={checkReceiver}>{t("create.check")}</button>
-          </div>
-          <span className="dim small">{receiverHintBefore}<a href={`https://t.me/${BOT}`} target="_blank" rel="noreferrer">{BOT}</a>{receiverHintAfter}</span>
-          {reach === "ok" && <span className="ok small">✓ {t("create.ready")}</span>}
-          {reach === "no" && <span className="error small">{t("create.notReady")}</span>}
-        </label>
 
         <div className="two">
           <label>{t("create.token")}
@@ -265,7 +241,7 @@ export default function CreatePage() {
           <div className="sum-total"><span>{t("create.total")}</span><b dir="ltr">{total} {form.token}</b></div>
         </div>
 
-        <p className="dim small">{t("create.security")}</p>
+        <p className="dim small">{t("create.buyerSecurity")}</p>
 
         {error && <p className="error" role="alert">{error}</p>}
 

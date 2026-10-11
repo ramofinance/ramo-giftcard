@@ -16,7 +16,6 @@ export type Config = {
 export type Form = {
   senderName: string;
   receiverName: string;
-  receiverId: string;
   cardText: string;
   cardFont: CardFont;
   cardTextSize: number;
@@ -42,8 +41,7 @@ export type Draft = {
 export type DeliverResult = {
   ok: boolean;
   orderId: string;
-  receiver: "sent" | "failed";
-  sender: "sent" | "failed" | "skipped";
+  buyer: "sent" | "failed";
   repeated?: boolean;
 };
 
@@ -64,7 +62,7 @@ export type OrderSummary = {
   amount: string;
   token: string;
   receiverName: string;
-  status: "delivered" | "receiver_failed";
+  status: "delivered" | "delivery_failed";
   createdAt: number;
 };
 

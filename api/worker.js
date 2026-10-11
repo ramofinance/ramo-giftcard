@@ -3,8 +3,8 @@
 // How a gift works (nothing secret is ever stored by us):
 //   1. The sender's browser creates a brand new wallet (12 words stay in the browser).
 //   2. The sender's own wallet pays: gift -> new wallet, fee -> our fee address (and a little BNB for gas).
-//   3. The browser calls /api/gift/deliver. We check the payments on BNB Chain, then relay the card and the
-//      12 words to the receiver (and a copy to the sender) through Telegram, and tell the admins amount + names.
+//   3. The browser calls /api/gift/deliver. We check the payments on BNB Chain, then send the card and
+//      the new wallet details to the buyer through Telegram, and tell the admins amount + names.
 //      The 12 words exist in this Worker's memory only while that single request runs. They are never written
 //      to KV or logs.
 //
@@ -12,9 +12,10 @@
 //   Binding   GIFT_KV            KV namespace (orders index, drafts, idempotency markers - no keys)
 //   Secret    BOT_TOKEN          the bot that sends the messages and signs the Telegram login
 //   Variable  FEE_ADDRESS        BNB Chain address that receives the 0.5 fee (public address only)
-//   Variable  ADMIN_CHAT_IDS     comma separated Telegram IDs that get the admin summary
+//   Variable  ADMIN_USERNAMES    comma separated Telegram usernames (without numeric IDs)
+//   Secret    TELEGRAM_WEBHOOK_SECRET  Telegram webhook authentication secret
 //   Variable  ALLOWED_ORIGINS    optional, default https://ramofinance.github.io (comma separated)
-//   Variable  FEE_USD / MIN_GIFT / MAX_GIFT / SENDER_COPY / BSC_RPC   optional
+//   Variable  FEE_USD / MIN_GIFT / MAX_GIFT / BSC_RPC   optional
 
 const TOKENS = {
   USDT: { address: "0x55d398326f99059ff775485246999027b3197955", decimals: 18 },
@@ -32,6 +33,19 @@ const enc = new TextEncoder();
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const pad32 = (a) => "0x" + String(a).toLowerCase().replace(/^0x/, "").padStart(64, "0");
+const localeOf = (value) => {
+  const code = String(value || "en").toLowerCase();
+  return ["fa", "ar", "es", "zh"].find((language) => code.startsWith(language)) || "en";
+};
+const usernameOf = (value) => String(value || "").trim().replace(/^@/, "").toLowerCase();
+const BOT_COPY = {
+  fa: { caption: "🎁 کارت هدیه برای {name}", title: "🎁 کارت و کیف هدیه‌ی شما آماده است", sender: "از طرف: {name}", amount: "مبلغ: {amount} {token} در شبکه‌ی BNB Smart Chain", message: "💌 پیام: {message}", words: "🔐 عبارت بازیابی ۱۲ کلمه‌ای کیف هدیه (برای دیدن، روی کلمات بزنید):", address: "آدرس کیف:", steps: "📲 مراحل دریافت", step1: "۱) کیف پول Rabby را نصب کنید: https://rabby.io", step2: "۲) گزینه‌ی Import Seed Phrase را بزنید و ۱۲ کلمه را به همان ترتیب وارد کنید.", step3: "۳) شبکه‌ی BNB Chain را انتخاب کنید؛ موجودی هدیه را همان‌جا می‌بینید.", gas: "⛽ کمی BNB هم برای کارمزد انتقال داخل کیف گذاشته شده است.", forward: "می‌توانید کارت و اطلاعات کیف را خودتان برای {name} بفرستید.", safety: "⚠️ این ۱۲ کلمه مثل رمز حساب بانکی است. هر کس آن‌ها را داشته باشد می‌تواند موجودی را جابه‌جا کند؛ فقط از راه امن برای گیرنده بفرستید.", adminTitle: "🎁 هدیه‌ی جدید: {status}", delivered: "به خریدار تحویل شد", failed: "ارسال به خریدار ناموفق بود", fee: "کارمزد", buyer: "خریدار", recipient: "نام روی کارت", order: "سفارش", registered: "✅ دسترسی مدیر برای این حساب فعال شد؛ اعلان‌های هدیه را دریافت می‌کنید.", notAdmin: "این حساب در فهرست مدیران ربات نیست." },
+  ar: { caption: "🎁 بطاقة هدية إلى {name}", title: "🎁 بطاقتك ومحفظة الهدية جاهزتان", sender: "من: {name}", amount: "المبلغ: {amount} {token} على BNB Smart Chain", message: "💌 الرسالة: {message}", words: "🔐 كلمات استعادة المحفظة (١٢ كلمة؛ اضغط لإظهارها):", address: "عنوان المحفظة:", steps: "📲 كيفية استخدام الهدية", step1: "١) ثبّت محفظة Rabby: https://rabby.io", step2: "٢) اختر Import Seed Phrase وأدخل الكلمات الـ١٢ بالترتيب نفسه.", step3: "٣) اختر شبكة BNB Chain لرؤية الرصيد.", gas: "⛽ أُضيف بعض BNB إلى المحفظة لرسوم التحويل.", forward: "يمكنك إرسال البطاقة ومعلومات المحفظة إلى {name} بنفسك.", safety: "⚠️ هذه الكلمات الـ١٢ تمنح السيطرة على الأموال. أرسلها إلى المستلم عبر وسيلة آمنة فقط.", adminTitle: "🎁 هدية جديدة: {status}", delivered: "تم التسليم إلى المشتري", failed: "تعذر الإرسال إلى المشتري", fee: "الرسوم", buyer: "المشتري", recipient: "الاسم على البطاقة", order: "الطلب", registered: "✅ تم تفعيل صلاحية المدير لهذا الحساب؛ ستصلك إشعارات الهدايا.", notAdmin: "هذا الحساب غير موجود في قائمة مديري البوت." },
+  en: { caption: "🎁 Gift card for {name}", title: "🎁 Your gift card and wallet are ready", sender: "From: {name}", amount: "Amount: {amount} {token} on BNB Smart Chain", message: "💌 Message: {message}", words: "🔐 Your gift wallet's 12 recovery words (tap to reveal):", address: "Wallet address:", steps: "📲 How to access the gift", step1: "1) Install Rabby Wallet: https://rabby.io", step2: "2) Choose Import Seed Phrase and enter the 12 words in order.", step3: "3) Select BNB Chain to see the gift balance.", gas: "⛽ A little BNB was added for the wallet's transfer fee.", forward: "You can forward the card and wallet details to {name} yourself.", safety: "⚠️ Anyone with these 12 words controls the funds. Share them with the recipient only through a secure channel.", adminTitle: "🎁 New gift: {status}", delivered: "delivered to buyer", failed: "could not be delivered to buyer", fee: "Fee", buyer: "Buyer", recipient: "Name on card", order: "Order", registered: "✅ Admin access is enabled for this account. Gift alerts are now active.", notAdmin: "This account is not listed as a bot administrator." },
+  es: { caption: "🎁 Tarjeta de regalo para {name}", title: "🎁 Tu tarjeta y cartera de regalo están listas", sender: "De: {name}", amount: "Importe: {amount} {token} en BNB Smart Chain", message: "💌 Mensaje: {message}", words: "🔐 Las 12 palabras de recuperación de tu cartera (pulsa para verlas):", address: "Dirección de la cartera:", steps: "📲 Cómo acceder al regalo", step1: "1) Instala Rabby Wallet: https://rabby.io", step2: "2) Elige Import Seed Phrase e introduce las 12 palabras en orden.", step3: "3) Selecciona BNB Chain para ver el saldo.", gas: "⛽ Se añadió algo de BNB para la comisión de transferencia.", forward: "Puedes reenviar tú mismo la tarjeta y los datos de la cartera a {name}.", safety: "⚠️ Quien tenga estas 12 palabras controla los fondos. Compártelas con quien recibe solo por un canal seguro.", adminTitle: "🎁 Nuevo regalo: {status}", delivered: "entregado al comprador", failed: "no se pudo entregar al comprador", fee: "Tarifa", buyer: "Comprador", recipient: "Nombre en la tarjeta", order: "Pedido", registered: "✅ Esta cuenta ya tiene acceso de administrador y recibirá avisos de regalos.", notAdmin: "Esta cuenta no figura entre los administradores del bot." },
+  zh: { caption: "🎁 送给 {name} 的礼品卡", title: "🎁 您的礼品卡和钱包已准备好", sender: "赠送人：{name}", amount: "金额：{amount} {token}（BNB Smart Chain）", message: "💌 留言：{message}", words: "🔐 礼品钱包的 12 个助记词（点击查看）：", address: "钱包地址：", steps: "📲 如何领取礼物", step1: "1) 安装 Rabby Wallet：https://rabby.io", step2: "2) 选择 Import Seed Phrase，并按顺序输入 12 个助记词。", step3: "3) 选择 BNB Chain 即可查看余额。", gas: "⛽ 钱包中已加入少量 BNB，用于转账手续费。", forward: "您可以自行将贺卡和钱包信息转发给 {name}。", safety: "⚠️ 持有这 12 个助记词的人可以控制资金。请仅通过安全渠道发送给收礼人。", adminTitle: "🎁 新礼物：{status}", delivered: "已发送给购买者", failed: "未能发送给购买者", fee: "手续费", buyer: "购买者", recipient: "贺卡上的姓名", order: "订单", registered: "✅ 此账号已启用管理员权限，将收到礼物通知。", notAdmin: "此账号不在机器人管理员名单中。" }
+};
+const fill = (text, values) => Object.entries(values).reduce((result, [key, value]) => result.split(`{${key}}`).join(value), text);
 
 const parseUnits = (s, dec) => {
   if (!/^\d+(\.\d{1,6})?$/.test(String(s))) return null;
@@ -100,6 +114,7 @@ async function tg(env, method, payload) {
   } catch { return { ok: false }; }
 }
 const sendHtml = (env, chat, text) => tg(env, "sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true });
+const canMessage = async (env, id) => (await tg(env, "sendChatAction", { chat_id: id, action: "typing" })).ok === true;
 
 async function sendCard(env, chat, pngBase64, caption) {
   try {
@@ -117,8 +132,58 @@ async function sendCard(env, chat, pngBase64, caption) {
   } catch { return { ok: false }; }
 }
 
-// A bot can only write to people who pressed Start. sendChatAction tells us without sending anything visible.
-const canMessage = async (env, id) => (await tg(env, "sendChatAction", { chat_id: id, action: "typing" })).ok === true;
+function buyerText(o) {
+  const c = BOT_COPY[o.language];
+  return [
+    c.title,
+    fill(c.sender, { name: esc(o.senderName) }),
+    fill(c.amount, { amount: esc(o.amount), token: esc(o.token) }),
+    o.message ? fill(c.message, { message: esc(o.message) }) : "",
+    c.words,
+    `<tg-spoiler>${esc(o.mnemonic)}</tg-spoiler>`,
+    `${c.address}\n<code>${esc(o.address)}</code>`,
+    c.steps,
+    c.step1,
+    c.step2,
+    c.step3,
+    o.gas ? c.gas : "",
+    fill(c.forward, { name: esc(o.receiverName) }),
+    c.safety
+  ].filter(Boolean).join("\n");
+}
+
+function adminText(o) {
+  const c = BOT_COPY[o.language];
+  return [
+    fill(c.adminTitle, { status: o.buyerOk ? c.delivered : c.failed }),
+    `${fill(c.amount, { amount: esc(o.amount), token: esc(o.token) })} • ${c.fee}: ${esc(o.fee)}`,
+    `${c.buyer}: ${o.username ? "@" + esc(o.username) : "Telegram"}`,
+    fill(c.sender, { name: esc(o.senderName) }),
+    `${c.recipient}: ${esc(o.receiverName)}`,
+    `${c.order}: ${esc(o.orderId)}`,
+    `https://bscscan.com/tx/${o.txs.gift}`,
+    `https://bscscan.com/tx/${o.txs.fee}`
+  ].join("\n");
+}
+
+function configuredAdmins(env) {
+  return new Set(String(env.ADMIN_USERNAMES || "").split(",").map(usernameOf).filter((name) => /^[a-z0-9_]{5,32}$/.test(name)));
+}
+
+async function handleTelegramWebhook(request, env, reply) {
+  const secret = String(env.TELEGRAM_WEBHOOK_SECRET || "");
+  if (!secret || request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) return reply({ error: "webhook_auth" }, 401);
+  const update = await readJson(request);
+  const message = update?.message;
+  if (typeof message?.text !== "string" || !/^\/start(?:@\w+)?(?:\s|$)/i.test(message.text)) return reply({ ok: true });
+  const username = usernameOf(message.from?.username);
+  if (message.chat?.type !== "private" || String(message.chat.id) !== String(message.from?.id)) return reply({ ok: true });
+  const isAdmin = Boolean(username && configuredAdmins(env).has(username));
+  const language = localeOf(message.from?.language_code);
+  if (isAdmin) await env.GIFT_KV.put(`admin:${username}`, String(message.chat.id));
+  await sendHtml(env, message.chat.id, BOT_COPY[language][isAdmin ? "registered" : "notAdmin"]);
+  return reply({ ok: true });
+}
 
 // ---------- BNB Chain checks (plain JSON-RPC) ----------
 async function rpc(env, method, params) {
@@ -175,16 +240,13 @@ async function handleStart(request, env, user, reply) {
   const b = await readJson(request);
   if (!b) return reply({ error: "json" }, 400);
   if (!env.FEE_ADDRESS || !/^0x[0-9a-fA-F]{40}$/.test(env.FEE_ADDRESS)) return reply({ error: "not_configured" }, 500);
-  const receiverId = Number(b.receiverId);
   const token = TOKENS[b.token];
-  if (!Number.isSafeInteger(receiverId) || receiverId <= 0) return reply({ error: "bad_receiver" }, 400);
   if (!token) return reply({ error: "bad_token" }, 400);
   const amount = parseUnits(b.amount, token.decimals);
   const min = parseUnits(env.MIN_GIFT || "1", 18);
   const max = parseUnits(env.MAX_GIFT || "5000", 18);
   if (amount === null || amount < min || amount > max) return reply({ error: "bad_amount" }, 400);
-  if (!(await canMessage(env, receiverId))) return reply({ error: "receiver_not_started", bot: BOT_USERNAME }, 409);
-
+  if (!(await canMessage(env, user.id))) return reply({ error: "buyer_not_started", bot: BOT_USERNAME }, 409);
   let code;
   for (let i = 0; i < 6; i += 1) {
     code = String(100000 + randInt(900000));
@@ -193,7 +255,7 @@ async function handleStart(request, env, user, reply) {
   // The fee carries a tiny order code (< 0.000000000001 USD). It ties the payment on-chain to THIS Telegram user.
   const feeUnits = parseUnits(env.FEE_USD || "0.5", 18) + BigInt(code);
   const gasWei = b.gas ? GAS_GIFT_WEI : 0n;
-  const draft = { tgId: user.id, receiverId, token: b.token, amountUnits: amount.toString(), feeUnits: feeUnits.toString(), gasWei: gasWei.toString(), createdAt: Date.now() };
+  const draft = { tgId: user.id, token: b.token, amountUnits: amount.toString(), feeUnits: feeUnits.toString(), gasWei: gasWei.toString(), createdAt: Date.now() };
   await env.GIFT_KV.put(`draft:${code}`, JSON.stringify(draft), { expirationTtl: DRAFT_TTL });
   return reply({ code, token: { symbol: b.token, address: token.address }, amountUnits: draft.amountUnits, feeUnits: draft.feeUnits, gasWei: draft.gasWei, feeAddress: env.FEE_ADDRESS });
 }
@@ -201,27 +263,6 @@ async function handleStart(request, env, user, reply) {
 const WORDS = /^([a-z]{3,8} ){11}[a-z]{3,8}$/;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 const ADDR = /^0x[0-9a-fA-F]{40}$/;
-
-function receiverText(o) {
-  return [
-    `🎁 <b>یک هدیه‌ی رمزارزی برای شما رسید!</b>`,
-    `از طرف: <b>${esc(o.senderName)}</b>`,
-    `مبلغ: <b>${esc(o.amount)} ${esc(o.token)}</b> (شبکه BNB Smart Chain)`,
-    o.message ? `\n💌 ${esc(o.message)}` : "",
-    `\n🔐 <b>عبارت بازیابی ۱۲ کلمه‌ای کیف شما</b> (برای دیدن، روی کلمات بزنید):`,
-    `<tg-spoiler>${esc(o.mnemonic)}</tg-spoiler>`,
-    `\nآدرس کیف:\n<code>${esc(o.address)}</code>`,
-    `\n📲 <b>مراحل دریافت</b>`,
-    `۱) کیف پول Rabby را نصب کنید: https://rabby.io`,
-    `۲) گزینه‌ی «Import Seed Phrase» (وارد کردن عبارت بازیابی) را بزنید و ۱۲ کلمه را به همان ترتیب وارد کنید.`,
-    `۳) شبکه‌ی BNB Chain را انتخاب کنید؛ موجودی هدیه را همان‌جا می‌بینید.`,
-    o.gas ? `⛽ مقدار کمی BNB هم برای کارمزد انتقال داخل کیف گذاشته شده است.` : "",
-    `\n⚠️ این ۱۲ کلمه مثل رمز عبور حساب بانکی است: به هیچ‌کس ندهید. کسی که این کلمات را دارد صاحب کیف است. برای امنیت کامل، بعد از ورود، موجودی را به کیف جدیدِ خودتان منتقل کنید.`
-  ].filter(Boolean).join("\n");
-}
-
-const senderText = (o) =>
-  `✅ <b>هدیه‌ی شما برای ${esc(o.receiverName)} ارسال شد.</b>\nمبلغ: ${esc(o.amount)} ${esc(o.token)}\nکد سفارش: <code>${esc(o.orderId)}</code>\n\n📎 نسخه‌ی شما از عبارت بازیابی همین کیف:\n<tg-spoiler>${esc(o.mnemonic)}</tg-spoiler>\n\nآدرس کیف: <code>${esc(o.address)}</code>\nاین نسخه فقط برای بایگانی شماست؛ هر کس این کلمات را داشته باشد می‌تواند موجودی را جابه‌جا کند.`;
 
 async function handleDeliver(request, env, user, reply) {
   const b = await readJson(request);
@@ -243,6 +284,7 @@ async function handleDeliver(request, env, user, reply) {
   const senderName = clean(b.senderName, 40);
   const receiverName = clean(b.receiverName, 40);
   const message = clean(b.message, 300);
+  const language = localeOf(b.language);
   const templateId = Number(b.templateId);
   const address = String(b.address || "");
   const senderWallet = String(b.senderWallet || "");
@@ -287,28 +329,21 @@ async function handleDeliver(request, env, user, reply) {
   // ----- deliver -----
   const orderId = "RG-" + Array.from({ length: 8 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[randInt(32)]).join("");
   const amount = formatUnits(draft.amountUnits, token.decimals);
-  const info = { senderName, receiverName, message, amount, token: draft.token, mnemonic, address, orderId, gas: draft.gasWei !== "0" };
+  const info = { senderName, receiverName, message, amount, token: draft.token, mnemonic, address, orderId, gas: draft.gasWei !== "0", language };
 
-  let receiverOk = false;
-  if (png) await sendCard(env, draft.receiverId, png, `🎁 هدیه از طرف <b>${esc(senderName)}</b> برای <b>${esc(receiverName)}</b>`);
-  receiverOk = (await sendHtml(env, draft.receiverId, receiverText(info))).ok === true;
+  const cardOk = png ? (await sendCard(env, user.id, png, fill(BOT_COPY[language].caption, { name: esc(receiverName) }))).ok === true : false;
+  const walletOk = (await sendHtml(env, user.id, buyerText(info))).ok === true;
+  const buyerOk = cardOk && walletOk;
 
-  let senderOk = false;
-  if (env.SENDER_COPY !== "false") senderOk = (await sendHtml(env, user.id, senderText(info))).ok === true;
+  const adminInfo = { amount, token: draft.token, fee: formatUnits(draft.feeUnits, 18), username: user.username, senderName, receiverName, orderId, language, buyerOk, txs };
+  const admins = configuredAdmins(env);
+  for (const username of admins) {
+    const chatId = await env.GIFT_KV.get(`admin:${username}`);
+    if (chatId) await sendHtml(env, chatId, adminText(adminInfo));
+  }
 
-  const link = (h) => `https://bscscan.com/tx/${h}`;
-  const adminText = [
-    `🎁 هدیه‌ی جدید ${receiverOk ? "(تحویل شد)" : "⚠️ (ارسال به گیرنده ناموفق بود)"}`,
-    `مبلغ: ${amount} ${draft.token} • کارمزد: ${formatUnits(draft.feeUnits, 18)}`,
-    `فرستنده: ${esc(senderName)} • ID ${user.id}${user.username ? " • @" + esc(user.username) : ""}`,
-    `گیرنده: ${esc(receiverName)} • ID ${draft.receiverId}`,
-    `سفارش: ${orderId}`,
-    link(txs.gift), link(txs.fee)
-  ].join("\n");
-  for (const id of String(env.ADMIN_CHAT_IDS || "").split(",").map((s) => s.trim()).filter(Boolean)) await sendHtml(env, id, adminText);
-
-  const result = { ok: true, orderId, receiver: receiverOk ? "sent" : "failed", sender: env.SENDER_COPY === "false" ? "skipped" : senderOk ? "sent" : "failed" };
-  const summary = { orderId, amount, token: draft.token, receiverName, status: receiverOk ? "delivered" : "receiver_failed", createdAt: Date.now() };
+  const result = { ok: true, orderId, buyer: buyerOk ? "sent" : "failed" };
+  const summary = { orderId, amount, token: draft.token, receiverName, status: buyerOk ? "delivered" : "delivery_failed", createdAt: Date.now() };
   await env.GIFT_KV.put(`done:${code}`, JSON.stringify({ tgId: user.id, result }), { expirationTtl: 2592000 });
   await env.GIFT_KV.put(`u:${user.id}:${String(Date.now()).padStart(13, "0")}:${orderId}`, "1", { metadata: summary });
   await env.GIFT_KV.delete(`draft:${code}`);
@@ -333,16 +368,11 @@ export default {
     try {
       if (request.method === "GET" && path === "/api/config") return reply(publicConfig(env));
       if (!env.GIFT_KV || !env.BOT_TOKEN) return reply({ error: "not_configured" }, 500);
+      if (request.method === "POST" && path === "/api/telegram/webhook") return await handleTelegramWebhook(request, env, reply);
 
       const user = await authenticate(request, env);
       if (!user) return reply({ error: "auth" }, 401);
 
-      if (request.method === "POST" && path === "/api/receiver/check") {
-        const b = await readJson(request);
-        const id = Number(b && b.receiverId);
-        if (!Number.isSafeInteger(id) || id <= 0) return reply({ error: "bad_receiver" }, 400);
-        return reply({ reachable: await canMessage(env, id), bot: BOT_USERNAME });
-      }
       if (request.method === "POST" && path === "/api/gift/start") return await handleStart(request, env, user, reply);
       if (request.method === "POST" && path === "/api/gift/deliver") return await handleDeliver(request, env, user, reply);
       if (request.method === "GET" && path === "/api/orders/mine") {
