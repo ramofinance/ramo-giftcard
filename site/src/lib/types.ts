@@ -1,7 +1,6 @@
-import type { CardTextColors, CardTextPositions } from "./templates";
+import type { CardFont, CardTextColors, CardTextPositions, CardTextStyles } from "./templates";
 
 export type TokenSymbol = "USDT" | "USDC";
-export type CardFont = "modern" | "classic" | "clean";
 
 export type Config = {
   chainId: number;
@@ -24,6 +23,7 @@ export type Form = {
   cardTextRotation: number;
   cardTextPositions?: CardTextPositions;
   cardTextColors?: CardTextColors;
+  cardTextStyles?: CardTextStyles;
   message: string;
   token: TokenSymbol;
   amount: string;

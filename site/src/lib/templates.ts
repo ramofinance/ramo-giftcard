@@ -17,9 +17,12 @@ export type Template = {
 };
 
 export type CardTextField = "brand" | "category" | "receiver" | "sender" | "amount" | "message" | "network";
+export type CardFont = "modern" | "classic" | "clean";
 export type CardTextPosition = { x: number; y: number };
 export type CardTextPositions = Partial<Record<CardTextField, CardTextPosition>>;
 export type CardTextColors = Partial<Record<CardTextField, string>>;
+export type CardTextStyle = { font: CardFont; size: number; rotation: number };
+export type CardTextStyles = Partial<Record<CardTextField, CardTextStyle>>;
 
 export const CATEGORIES = [
   { key: "birthday", name: "تولد", emoji: "🎂" },

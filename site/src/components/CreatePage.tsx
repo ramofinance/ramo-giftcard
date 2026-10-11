@@ -6,8 +6,8 @@ import { api, errorText } from "../lib/api";
 import { clearPending, createPending, loadPending, runPayment } from "../lib/flow";
 import type { Step } from "../lib/flow";
 import { getTemplate } from "../lib/templates";
-import type { CardTextField, CardTextPosition } from "../lib/templates";
-import { defaultCardTextColors, defaultCardTextPositions } from "../lib/card";
+import type { CardTextField, CardTextPosition, CardTextStyle } from "../lib/templates";
+import { defaultCardTextColors, defaultCardTextPositions, defaultCardTextStyles } from "../lib/card";
 import { BOT, currentUser, inMiniApp } from "../lib/telegram";
 import { DEFAULT_CONFIG } from "../lib/types";
 import type { Config, DeliverResult, Form, Pending } from "../lib/types";
@@ -46,10 +46,19 @@ export default function CreatePage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const defaultPositions = defaultCardTextPositions(template);
   const defaultColors = defaultCardTextColors(template);
+  const defaultStyles = defaultCardTextStyles(template);
   const textPositions = { ...defaultPositions, ...form.cardTextPositions };
   const textColors = { ...defaultColors, ...form.cardTextColors };
+  const textStyles = { ...defaultStyles, ...form.cardTextStyles };
   const position = textPositions[selectedText]!;
+  const textStyle = textStyles[selectedText]!;
   const updatePosition = (field: CardTextField, value: CardTextPosition) => set("cardTextPositions", { ...defaultCardTextPositions(template), ...form.cardTextPositions, [field]: value });
+  const updateTextStyle = (field: CardTextField, value: CardTextStyle) => set("cardTextStyles", { ...defaultStyles, ...form.cardTextStyles, [field]: value });
+  const resetLayer = () => {
+    updatePosition(selectedText, defaultPositions[selectedText]!);
+    updateTextStyle(selectedText, defaultStyles[selectedText]);
+    set("cardTextColors", { ...defaultColors, ...form.cardTextColors, [selectedText]: defaultColors[selectedText] });
+  };
 
   useEffect(() => {
     api<Config>("/api/config", { auth: false }).then(setCfg).catch(() => {});
@@ -155,7 +164,7 @@ export default function CreatePage() {
   return (
     <div className="create">
       <section className="create-preview">
-        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} cardTextPositions={textPositions} cardTextColors={textColors} selectedText={selectedText} onTextSelect={setSelectedText} onTextPositionChange={updatePosition} language={language} />
+        <CardPreview template={template} senderName={form.senderName} receiverName={form.receiverName} amount={form.amount} token={form.token} cardText={form.cardText} cardFont={form.cardFont} cardTextSize={form.cardTextSize} cardTextRotation={form.cardTextRotation} cardTextPositions={textPositions} cardTextColors={textColors} cardTextStyles={textStyles} selectedText={selectedText} onTextSelect={setSelectedText} onTextPositionChange={updatePosition} onTextStyleChange={updateTextStyle} language={language} />
         <div className="row between">
           <span className="dim small">{t("create.template")}: {t(`tpl.${template.design}`)}</span>
           <Link to="/templates" className="small">{t("create.change")}</Link>
@@ -204,21 +213,6 @@ export default function CreatePage() {
         </div>
 
         <label>{t("create.cardText")}<input value={form.cardText} maxLength={80} placeholder={t("create.cardPlaceholder")} onChange={(e) => set("cardText", e.target.value)} /></label>
-        <div className="two">
-          <label>{t("create.font")}
-            <select value={form.cardFont} onChange={(e) => set("cardFont", e.target.value as Form["cardFont"])}>
-              <option value="modern">{t("create.fontModern")}</option>
-              <option value="classic">{t("create.fontClassic")}</option>
-              <option value="clean">{t("create.fontClean")}</option>
-            </select>
-          </label>
-          <label className="range-field"><span className="range-label"><span>{t("create.textSize")}</span><b>{form.cardTextSize}px</b></span>
-            <input type="range" min="16" max="38" value={form.cardTextSize} onChange={(e) => set("cardTextSize", Number(e.target.value))} />
-          </label>
-        </div>
-        <label className="range-field"><span className="range-label"><span>{t("create.rotation")}</span><b>{form.cardTextRotation > 0 ? `+${form.cardTextRotation}` : form.cardTextRotation}°</b></span>
-          <input type="range" min="-12" max="12" value={form.cardTextRotation} onChange={(e) => set("cardTextRotation", Number(e.target.value))} />
-        </label>
         <div className="text-editor">
           <h3>{t("create.textEditorTitle")}</h3>
           <p className="editor-hint">{t("create.textEditorHint")}</p>
@@ -230,6 +224,21 @@ export default function CreatePage() {
           <label className="color-field">{t("create.textColor")}
             <input type="color" value={textColors[selectedText]!} onChange={(e) => set("cardTextColors", { ...defaultColors, ...form.cardTextColors, [selectedText]: e.target.value })} />
           </label>
+          <label>{t("create.font")}
+            <select value={textStyle.font} onChange={(e) => updateTextStyle(selectedText, { ...textStyle, font: e.target.value as CardTextStyle["font"] })}>
+              <option value="modern">{t("create.fontModern")}</option>
+              <option value="classic">{t("create.fontClassic")}</option>
+              <option value="clean">{t("create.fontClean")}</option>
+            </select>
+          </label>
+          <div className="text-controls">
+            <label className="range-field"><span className="range-label"><span>{t("create.textSize")}</span><b>{textStyle.size}px</b></span>
+              <input type="range" min="10" max="100" value={textStyle.size} onChange={(e) => updateTextStyle(selectedText, { ...textStyle, size: Number(e.target.value) })} />
+            </label>
+            <label className="range-field"><span className="range-label"><span>{t("create.rotation")}</span><b>{textStyle.rotation > 0 ? `+${textStyle.rotation}` : textStyle.rotation}°</b></span>
+              <input type="range" min="-180" max="180" value={textStyle.rotation} onChange={(e) => updateTextStyle(selectedText, { ...textStyle, rotation: Number(e.target.value) })} />
+            </label>
+          </div>
           <div className="text-controls">
             <label className="range-field"><span className="range-label"><span>{t("create.positionX")}</span><b>{position.x}px</b></span>
               <input type="range" min="0" max="1000" value={position.x} onChange={(e) => updatePosition(selectedText, { ...position, x: Number(e.target.value) })} />
@@ -239,7 +248,7 @@ export default function CreatePage() {
             </label>
           </div>
           <div className="editor-actions">
-            <button type="button" className="btn ghost" onClick={() => updatePosition(selectedText, defaultPositions[selectedText]!)}>{t("create.resetPosition")}</button>
+            <button type="button" className="btn ghost" onClick={resetLayer}>{t("create.resetPosition")}</button>
           </div>
         </div>
         <label>{t("create.personalMessage")}<textarea rows={3} maxLength={300} value={form.message} onChange={(e) => set("message", e.target.value)} /></label>

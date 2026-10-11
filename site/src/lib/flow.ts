@@ -73,6 +73,7 @@ export async function runPayment(p: Pending, onStep: (s: Step) => void, language
     cardTextRotation: p.form.cardTextRotation || 0,
     cardTextPositions: p.form.cardTextPositions,
     cardTextColors: p.form.cardTextColors,
+    cardTextStyles: p.form.cardTextStyles,
     language
   });
   for (let attempt = 0; attempt < 20; attempt += 1) {
