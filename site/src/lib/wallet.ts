@@ -35,6 +35,17 @@ export async function connectWallet(): Promise<string> {
   return accounts[0];
 }
 
+export async function disconnectWallet(): Promise<boolean> {
+  const eth = provider();
+  if (!eth?.request) return false;
+  try {
+    await eth.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendToken(from: string, token: string, to: string, units: bigint): Promise<string> {
   await ensureBsc();
   return provider().request({ method: "eth_sendTransaction", params: [{ from, to: token, data: encodeTransfer(to, units) }] });
