@@ -1,15 +1,22 @@
+import { useEffect, useState } from "react";
 import { HashRouter, Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import CreatePage from "./components/CreatePage";
 import HomePage from "./components/HomePage";
 import MyGifts from "./components/MyGifts";
 import TemplatesPage from "./components/TemplatesPage";
 import { loadPending } from "./lib/flow";
-import { currentUser } from "./lib/telegram";
+import { bridgeReady, currentUser, embedded } from "./lib/telegram";
 import { LANGUAGES, LanguageProvider, useLanguage } from "./lib/i18n";
 import logoMark from "./assets/ramo-logo-mark.jpg";
 
 function Layout() {
   useLocation(); // re-render on navigation so the banner below stays current
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    const onChange = () => refresh((n) => n + 1);
+    window.addEventListener("ramo-pending", onChange);
+    return () => window.removeEventListener("ramo-pending", onChange);
+  }, []);
   const pending = loadPending();
   const user = currentUser();
   const { language, setLanguage, t } = useLanguage();
@@ -48,6 +55,10 @@ function Layout() {
 
 // HashRouter works on GitHub Pages and inside the Telegram Mini App without server rewrites.
 export default function App() {
+  // Inside the Mini App, wait for the Telegram session to arrive from the parent page before showing anything.
+  const [ready, setReady] = useState(!embedded);
+  useEffect(() => { if (!ready) bridgeReady.then(() => setReady(true)); }, [ready]);
+  if (!ready) return <div aria-busy="true" />;
   return (
     <LanguageProvider>
       <HashRouter>

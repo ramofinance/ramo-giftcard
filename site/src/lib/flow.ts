@@ -15,11 +15,12 @@ const SAFETY_BNB = 300000000000000n; // 0.0003 BNB kept for the sender's own net
 export const loadPending = (): Pending | null => {
   try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; }
 };
-export const savePending = (p: Pending) => localStorage.setItem(KEY, JSON.stringify(p));
-export const clearPending = () => localStorage.removeItem(KEY);
+const notify = () => window.dispatchEvent(new Event("ramo-pending"));
+export const savePending = (p: Pending) => { localStorage.setItem(KEY, JSON.stringify(p)); notify(); };
+export const clearPending = () => { localStorage.removeItem(KEY); notify(); };
 
 // Step 1: ask the server for an order and create the gift wallet in the browser.
-// The 12 words stay here until the buyer's Telegram delivery.
+// The 12 words stay here until the buyer confirms they saved them.
 export async function createPending(form: Form, templateId: number, senderWallet: string): Promise<Pending> {
   const draft = await api<Draft>("/api/gift/start", {
     body: { token: form.token, amount: form.amount, gas: form.gas }
@@ -93,7 +94,8 @@ export async function runPayment(p: Pending, onStep: (s: Step) => void, language
           language
         }
       });
-      clearPending(); // the 12 words are wiped from this browser once delivery is done
+      p.delivered = result;
+      savePending(p); // the 12 words stay in this browser until the buyer confirms they saved them
       return result;
     } catch (e) {
       // "pending" = the network needs a few more blocks; "rpc_unavailable" = try again shortly

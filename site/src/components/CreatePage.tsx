@@ -8,14 +8,16 @@ import type { Step } from "../lib/flow";
 import { getTemplate } from "../lib/templates";
 import type { CardTextField, CardTextPosition, CardTextStyle } from "../lib/templates";
 import { defaultCardTextColors, defaultCardTextPositions, defaultCardTextStyles } from "../lib/card";
-import { BOT, currentUser, inMiniApp } from "../lib/telegram";
+import { currentUser, embedded, inMiniApp, openInBrowser } from "../lib/telegram";
 import { DEFAULT_CONFIG } from "../lib/types";
 import type { Config, DeliverResult, Form, Pending } from "../lib/types";
 import { fromUnits, shortAddress, toUnits } from "../lib/units";
-import { connectWallet, disconnectWallet, hasWallet, walletErrorText } from "../lib/wallet";
+import { connectWallet, disconnectWallet, hasInjectedWallet, walletErrorText, watchWallet } from "../lib/wallet";
+import type { WalletKind } from "../lib/wallet";
 import { useLanguage } from "../lib/i18n";
 
 type Done = { result: DeliverResult; mnemonic: string; address: string; txs: Pending["txs"]; receiverName: string };
+const doneFrom = (p: Pending, result: DeliverResult): Done => ({ result, mnemonic: p.mnemonic, address: p.address, txs: p.txs, receiverName: p.form.receiverName });
 const TEXT_FIELDS: CardTextField[] = ["brand", "category", "receiver", "sender", "amount", "message", "network"];
 
 export default function CreatePage() {
@@ -26,14 +28,17 @@ export default function CreatePage() {
   const [cfg, setCfg] = useState<Config>(DEFAULT_CONFIG);
   const [user, setUser] = useState(currentUser());
   const [account, setAccount] = useState("");
-  const [form, setForm] = useState<Form>({ senderName: "", receiverName: "", receiverId: "", cardText: "", cardFont: "modern", cardTextSize: 23, cardTextRotation: 0, message: "", token: "USDT", amount: "10", gas: true });
+  const [form, setForm] = useState<Form>({ senderName: "", receiverName: "", cardText: "", cardFont: "modern", cardTextSize: 23, cardTextRotation: 0, message: "", token: "USDT", amount: "10", gas: true });
   const [selectedText, setSelectedText] = useState<CardTextField>("receiver");
-  const [reach, setReach] = useState<"idle" | "ok" | "no">("idle");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<Step | null>(null);
   const [error, setError] = useState("");
-  const [pending, setPending] = useState<Pending | null>(loadPending());
-  const [done, setDone] = useState<Done | null>(null);
+  const stored = useMemo(() => loadPending(), []);
+  // A gift that was already delivered but not yet confirmed as saved comes straight back to the "save your words" screen.
+  const [pending, setPending] = useState<Pending | null>(stored && !stored.delivered ? stored : null);
+  const [done, setDone] = useState<Done | null>(stored?.delivered ? doneFrom(stored, stored.delivered) : null);
+  const [saved, setSaved] = useState(false);
+  const [copyNote, setCopyNote] = useState<"" | "copied" | "failed">("");
   const [reveal, setReveal] = useState(false);
   const [disconnectStatus, setDisconnectStatus] = useState<"revoked" | "manual" | null>(null);
   const stepLabels: [Step, string][] = [
@@ -67,19 +72,13 @@ export default function CreatePage() {
   useEffect(() => {
     if (user && !form.senderName) set("senderName", user.first_name);
   }, [user]);
-  useEffect(() => {
-    const eth = (window as any).ethereum;
-    const onAccounts = (a: string[]) => setAccount(a[0] || "");
-    eth?.on?.("accountsChanged", onAccounts);
-    return () => eth?.removeListener?.("accountsChanged", onAccounts);
-  }, []);
+  useEffect(() => watchWallet((a) => setAccount(a[0] || "")), [account]);
 
   const giftUnits = toUnits(form.amount);
   const total = useMemo(() => (giftUnits === null ? "—" : fromUnits(giftUnits + (toUnits(cfg.feeUsd) ?? 0n))), [giftUnits, cfg.feeUsd]);
 
   const validate = (): string | null => {
     if (!form.senderName.trim() || !form.receiverName.trim()) return t("create.validateNames");
-    if (!/^\d{5,15}$/.test(form.receiverId.trim())) return t("create.validateId");
     const min = toUnits(cfg.minGift);
     const max = toUnits(cfg.maxGift);
     if (giftUnits === null || (min !== null && giftUnits < min) || (max !== null && giftUnits > max)) return t("create.validateAmount", { min: cfg.minGift, max: cfg.maxGift, token: form.token });
@@ -92,18 +91,10 @@ export default function CreatePage() {
     if (p && !p.txs.gift) { clearPending(); setPending(null); } else setPending(p); // nothing paid yet -> nothing to resume
   };
 
-  const checkReceiver = async () => {
-    setError("");
-    try {
-      const r = await api<{ reachable: boolean }>("/api/receiver/check", { body: { receiverId: Number(form.receiverId) } });
-      setReach(r.reachable ? "ok" : "no");
-    } catch (e) { fail(e); }
-  };
-
-  const connect = async () => {
+  const connect = async (kind?: WalletKind) => {
     setError("");
     setDisconnectStatus(null);
-    try { setAccount(await connectWallet()); } catch (e) { setError(walletErrorText(e, language) ?? t("create.walletConnectFailed")); }
+    try { setAccount(await connectWallet(kind)); } catch (e) { setError(walletErrorText(e, language) ?? t("create.walletConnectFailed")); }
   };
 
   const disconnect = async () => {
@@ -114,7 +105,8 @@ export default function CreatePage() {
 
   const finish = (p: Pending, result: DeliverResult) => {
     setPending(null);
-    setDone({ result, mnemonic: p.mnemonic, address: p.address, txs: p.txs, receiverName: p.form.receiverName });
+    setSaved(false);
+    setDone(doneFrom(p, result));
   };
 
   const pay = async () => {
@@ -136,18 +128,26 @@ export default function CreatePage() {
     try { finish(pending, await runPayment(pending, setStep, language)); } catch (e) { fail(e); } finally { setBusy(false); setStep(null); }
   };
 
-  const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyNote("copied");
+    } catch {
+      setCopyNote("failed");
+    }
+    setTimeout(() => setCopyNote(""), 4000);
+  };
 
   // ---------- finished ----------
   if (done) {
     const r = done.result;
+    const delivered = r.buyer === "sent";
     return (
       <div className="panel">
-        <h1 className="page-title">{r.receiver === "sent" ? `🎉 ${t("create.sent")}` : t("create.failed")}</h1>
-        {r.receiver === "sent"
+        <h1 className="page-title">{delivered ? `🎉 ${t("create.sent")}` : t("create.failed")}</h1>
+        {delivered
           ? <p className="ok">{t("create.sentInfo", { name: done.receiverName })}</p>
-          : <p className="error">{t("create.failedInfo")}</p>}
-        {r.sender === "sent" && <p className="dim">{t("create.senderCopy")}</p>}
+          : <p className="error">{t("create.failedInfo", { name: done.receiverName })}</p>}
         <p className="dim small">{t("create.order")}: {r.orderId}</p>
         <div className="backup">
           <strong>{t("create.backup")}</strong>
@@ -159,20 +159,26 @@ export default function CreatePage() {
             <button className="btn ghost" onClick={() => copy(done.mnemonic)}>{t("create.copyWords")}</button>
             {done.txs.gift && <a className="btn ghost" target="_blank" rel="noreferrer" href={`https://bscscan.com/tx/${done.txs.gift}`}>{t("create.bscscan")}</a>}
           </div>
+          {copyNote === "copied" && <p className="ok small">{t("create.copied")}</p>}
+          {copyNote === "failed" && <p className="error small" role="alert">{t("create.copyFailed")}</p>}
         </div>
+        <label className="check">
+          <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+          <span>{t("create.confirmSaved")}</span>
+        </label>
+        <p className="dim small">{t("create.confirmHint")}</p>
         {account && <div className="row between">
           <p className="dim small" dir="ltr">{t("create.wallet")}: {shortAddress(account)}</p>
           <button className="btn ghost" onClick={disconnect}>{t("create.disconnect")}</button>
         </div>}
         {disconnectStatus && <p className="dim small">{t(disconnectStatus === "revoked" ? "create.disconnectSuccess" : "create.disconnectManual")}</p>}
-        <button className="btn" onClick={() => { setDone(null); setReveal(false); }}>{t("create.another")}</button>
+        <button className="btn" disabled={!saved} onClick={() => { clearPending(); setDone(null); setReveal(false); setSaved(false); }}>{t("create.another")}</button>
       </div>
     );
   }
 
   const needLogin = !user;
   const needWallet = !account;
-  const [receiverHintBefore, receiverHintAfter] = t("create.receiverHint").split("{bot}");
 
   return (
     <div className="create">
@@ -202,17 +208,6 @@ export default function CreatePage() {
           <label>{t("create.sender")}<input value={form.senderName} maxLength={40} onChange={(e) => set("senderName", e.target.value)} /></label>
           <label>{t("create.receiver")}<input value={form.receiverName} maxLength={40} onChange={(e) => set("receiverName", e.target.value)} /></label>
         </div>
-
-        <label>
-          {t("create.receiverId")}
-          <div className="inline">
-            <input dir="ltr" inputMode="numeric" placeholder="123456789" value={form.receiverId} onChange={(e) => { set("receiverId", e.target.value.replace(/\D/g, "")); setReach("idle"); }} />
-            <button type="button" className="btn ghost" disabled={!user || form.receiverId.length < 5} onClick={checkReceiver}>{t("create.check")}</button>
-          </div>
-          <span className="dim small">{receiverHintBefore}<a href={`https://t.me/${BOT}`} target="_blank" rel="noreferrer">{BOT}</a>{receiverHintAfter}</span>
-          {reach === "ok" && <span className="ok small">✓ {t("create.ready")}</span>}
-          {reach === "no" && <span className="error small">{t("create.notReady")}</span>}
-        </label>
 
         <div className="two">
           <label>{t("create.token")}
@@ -297,13 +292,10 @@ export default function CreatePage() {
           </div>
         ) : needWallet ? (
           <>
-          <button className="btn wide" onClick={connect} disabled={!hasWallet()}>{t("create.connect")}</button>
-          {!hasWallet() && (
-            <p className="dim small">
-                {t("create.noWallet")}
-                <button className="link" onClick={() => copy(window.location.href)}>{t("create.copyLink")}</button>
-              </p>
-            )}
+            {hasInjectedWallet() && <button className="btn wide" onClick={() => connect("injected")}>{t("create.connectBrowser")}</button>}
+            <button className={hasInjectedWallet() ? "btn ghost wide" : "btn wide"} onClick={() => connect("walletconnect")}>{t("create.connectWC")}</button>
+            <p className="dim small">{t("create.wcHelp")}</p>
+            {embedded && <p className="dim small"><button className="link" onClick={openInBrowser}>{t("create.openBrowser")}</button></p>}
           </>
         ) : (
           <button className="btn wide" onClick={pay} disabled={busy}>

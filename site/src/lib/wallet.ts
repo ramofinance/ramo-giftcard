@@ -1,4 +1,6 @@
-// Talks to the sender's own wallet (Rabby, MetaMask, Trust...) through the standard browser provider.
+// Talks to the sender's own wallet. Two ways to connect:
+//  - the browser's own wallet (Rabby, MetaMask... extension or in-app browser), or
+//  - WalletConnect, which links a mobile wallet app (this is the one that works inside the Telegram Mini App).
 // We never see the sender's keys: every payment is approved inside their wallet.
 import { translate, type Language } from "./i18n";
 
@@ -10,14 +12,23 @@ const BSC = {
   blockExplorerUrls: ["https://bscscan.com"]
 };
 
-const provider = (): any => (window as any).ethereum;
-export const hasWallet = () => Boolean(provider());
+// A WalletConnect (Reown) project id is public by design; it is tied to the allowed domain in the Reown dashboard.
+const WC_PROJECT_ID = (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined) || "2231447cf6113068177243953288f7a4";
+
+export type WalletKind = "injected" | "walletconnect";
+
+const injected = (): any => (window as any).ethereum;
+let wc: any = null; // the WalletConnect provider, created the first time it is needed
+let active: any = null; // the provider of the wallet that is connected right now
+
+const provider = (): any => active ?? injected();
+export const hasInjectedWallet = () => Boolean(injected());
 
 const pad = (hex: string) => hex.replace(/^0x/, "").toLowerCase().padStart(64, "0");
 export const encodeTransfer = (to: string, units: bigint) => "0xa9059cbb" + pad(to) + units.toString(16).padStart(64, "0");
 
-async function ensureBsc() {
-  const eth = provider();
+async function ensureBsc(eth: any = provider()) {
+  if (eth === wc) return; // a WalletConnect session is opened on BNB Smart Chain only
   if ((await eth.request({ method: "eth_chainId" })) === BSC.chainId) return;
   try {
     await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: BSC.chainId }] });
@@ -27,23 +38,68 @@ async function ensureBsc() {
   }
 }
 
-export async function connectWallet(): Promise<string> {
-  const eth = provider();
-  if (!eth) throw new Error("no_wallet");
-  const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
-  await ensureBsc();
-  return accounts[0];
+async function walletConnectProvider(): Promise<any> {
+  if (wc) return wc;
+  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+  wc = await EthereumProvider.init({
+    projectId: WC_PROJECT_ID,
+    chains: [56],
+    showQrModal: true,
+    rpcMap: { 56: BSC.rpcUrls[0] },
+    metadata: {
+      name: "RAMO Gift Card",
+      description: "Crypto gift cards on Telegram",
+      url: window.location.origin,
+      icons: []
+    }
+  });
+  return wc;
+}
+
+export async function connectWallet(kind: WalletKind = injected() ? "injected" : "walletconnect"): Promise<string> {
+  if (kind === "injected") {
+    const eth = injected();
+    if (!eth) throw new Error("no_wallet");
+    const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
+    await ensureBsc(eth);
+    active = eth;
+    return accounts[0];
+  }
+  const prov = await walletConnectProvider();
+  if (!prov.session) await prov.connect();
+  const account: string | undefined = prov.accounts?.[0];
+  if (!account) throw new Error("no_wallet");
+  active = prov;
+  return account;
 }
 
 export async function disconnectWallet(): Promise<boolean> {
   const eth = provider();
-  if (!eth?.request) return false;
+  active = null;
+  if (!eth) return false;
+  if (eth === wc) {
+    try { await wc.disconnect(); return true; } catch { return false; }
+  }
+  if (!eth.request) return false;
   try {
     await eth.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
     return true;
   } catch {
     return false;
   }
+}
+
+// Calls back when the connected account changes or the wallet link is closed. Returns a function that stops listening.
+export function watchWallet(onAccounts: (accounts: string[]) => void): () => void {
+  const eth = provider();
+  if (!eth?.on) return () => {};
+  const onClosed = () => onAccounts([]);
+  eth.on("accountsChanged", onAccounts);
+  if (eth === wc) eth.on("disconnect", onClosed);
+  return () => {
+    eth.removeListener?.("accountsChanged", onAccounts);
+    if (eth === wc) eth.removeListener?.("disconnect", onClosed);
+  };
 }
 
 export async function sendToken(from: string, token: string, to: string, units: bigint): Promise<string> {

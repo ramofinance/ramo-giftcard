@@ -16,7 +16,6 @@ export type Config = {
 export type Form = {
   senderName: string;
   receiverName: string;
-  receiverId: string;
   cardText: string;
   cardFont: CardFont;
   cardTextSize: number;
@@ -39,15 +38,16 @@ export type Draft = {
   feeAddress: string;
 };
 
+// The card and the new wallet's details are sent to the buyer on Telegram ("buyer"); the admins are told separately.
 export type DeliverResult = {
   ok: boolean;
   orderId: string;
-  receiver: "sent" | "failed";
-  sender: "sent" | "failed" | "skipped";
+  buyer: "sent" | "failed";
+  adminNotifications?: unknown;
   repeated?: boolean;
 };
 
-// Kept only in this browser until the gift is delivered, so a closed tab can never lose money.
+// Kept only in this browser until the buyer confirms they saved the 12 words, so a closed tab can never lose money.
 export type Pending = {
   draft: Draft;
   address: string;
@@ -56,6 +56,7 @@ export type Pending = {
   form: Form;
   templateId: number;
   txs: { gift?: string; fee?: string; gas?: string };
+  delivered?: DeliverResult;
   createdAt: number;
 };
 
@@ -64,7 +65,7 @@ export type OrderSummary = {
   amount: string;
   token: string;
   receiverName: string;
-  status: "delivered" | "receiver_failed";
+  status: "delivered" | "delivery_failed";
   createdAt: number;
 };
 
